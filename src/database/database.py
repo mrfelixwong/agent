@@ -60,6 +60,8 @@ class Database:
                     transcript TEXT,
                     summary TEXT,  -- JSON summary data
                     action_items TEXT,  -- JSON array
+                    transcription_cost REAL DEFAULT 0.0,  -- Cost in USD
+                    transcription_duration REAL DEFAULT 0.0,  -- Duration in seconds
                     status TEXT DEFAULT 'recorded',  -- recorded, transcribed, summarized, sent
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -84,6 +86,27 @@ class Database:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_daily_summaries_date ON daily_summaries(date)")
             
             conn.commit()
+            
+            # Run migrations to add new columns to existing databases
+            self._run_migrations(conn)
+    
+    def _run_migrations(self, conn):
+        """Run database migrations to add new columns"""
+        cursor = conn.cursor()
+        
+        # Check if transcription_cost column exists
+        cursor.execute("PRAGMA table_info(meetings)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'transcription_cost' not in columns:
+            logger.info("Adding transcription_cost column to meetings table")
+            cursor.execute("ALTER TABLE meetings ADD COLUMN transcription_cost REAL DEFAULT 0.0")
+        
+        if 'transcription_duration' not in columns:
+            logger.info("Adding transcription_duration column to meetings table")
+            cursor.execute("ALTER TABLE meetings ADD COLUMN transcription_duration REAL DEFAULT 0.0")
+        
+        conn.commit()
     
     def save_meeting(
         self,
@@ -138,22 +161,35 @@ class Database:
             logger.info(f"Meeting saved with ID: {meeting_id}")
             return meeting_id
     
-    def update_meeting_transcript(self, meeting_id: int, transcript: str) -> bool:
-        """Update meeting transcript"""
+    def update_meeting_transcript(self, meeting_id: int, transcript: str, 
+                                 cost_info: Optional[Dict[str, float]] = None) -> bool:
+        """Update meeting transcript with optional cost information"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             
-            cursor.execute("""
-                UPDATE meetings 
-                SET transcript = ?, status = 'transcribed', updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            """, (transcript, meeting_id))
+            if cost_info:
+                cursor.execute("""
+                    UPDATE meetings 
+                    SET transcript = ?, status = 'transcribed', 
+                        transcription_cost = ?, transcription_duration = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (transcript, cost_info['total_cost'], 
+                      cost_info['total_duration_seconds'], meeting_id))
+            else:
+                cursor.execute("""
+                    UPDATE meetings 
+                    SET transcript = ?, status = 'transcribed', updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (transcript, meeting_id))
             
             success = cursor.rowcount > 0
             conn.commit()
             
             if success:
                 logger.info(f"Transcript updated for meeting {meeting_id}")
+                if cost_info:
+                    logger.info(f"Transcription cost: ${cost_info['total_cost']:.4f}")
             
             return success
     

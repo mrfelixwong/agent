@@ -265,8 +265,9 @@ class MeetingAgent:
             end_time = datetime.now()
             duration_minutes = int((end_time - self.current_meeting['start_time']).total_seconds() / 60)
             
-            # Update meeting with transcript
-            self.db.update_meeting_transcript(meeting_id, final_transcript)
+            # Update meeting with transcript and cost info
+            cost_info = self.transcriber.get_cost_info()
+            self.db.update_meeting_transcript(meeting_id, final_transcript, cost_info)
             
             # Generate AI summary
             logger.info("Generating meeting summary...")
@@ -312,6 +313,7 @@ class MeetingAgent:
                 'transcript': final_transcript,
                 'summary': summary,
                 'audio_info': audio_info,
+                'cost_info': cost_info,
                 'status': 'completed'
             })
             
@@ -346,6 +348,9 @@ class MeetingAgent:
         # Get current transcript
         current_transcript = self.transcriber.get_current_transcript()
         
+        # Get cost info
+        cost_info = self.transcriber.get_cost_info()
+        
         return {
             'status': 'recording',
             'meeting': {
@@ -357,7 +362,8 @@ class MeetingAgent:
                 'audio_file_path': self.current_meeting['audio_file_path']
             },
             'transcript': current_transcript,
-            'transcription_status': self.transcriber.get_transcription_status()
+            'transcription_status': self.transcriber.get_transcription_status(),
+            'cost_info': cost_info
         }
     
     def get_meeting_history(self, days_back: int = 30) -> List[Dict[str, Any]]:

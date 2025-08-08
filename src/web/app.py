@@ -369,6 +369,7 @@ def create_simple_app(meeting_agent) -> Flask:
                         <p><strong>System Status:</strong> {system_status.get('status', 'Unknown')}</p>
                         
                         {'<p><strong>Current Meeting:</strong> ' + status.get('meeting', {}).get('name', 'None') + '</p>' if status.get('meeting') else ''}
+                        {'<p><strong>Current Transcription Cost:</strong> $' + f"{status.get('cost_info', {}).get('total_cost', 0.0):.4f}" + ' (' + f"{status.get('cost_info', {}).get('total_duration_minutes', 0.0):.1f}" + ' minutes)</p>' if status.get('meeting') else ''}
                     </div>
                     
                     <div class="controls">
@@ -428,10 +429,12 @@ def create_simple_app(meeting_agent) -> Flask:
         try:
             meeting_info = app.meeting_agent.stop_meeting()
             
+            cost_info = meeting_info.get('cost_info', {})
             return f"""
             <h1>Meeting Stopped</h1>
             <p>Meeting "{meeting_info.get('name', 'Unknown')}" completed successfully!</p>
             <p>Duration: {meeting_info.get('duration_minutes', 0)} minutes</p>
+            <p>Transcription Cost: ${cost_info.get('total_cost', 0.0):.4f}</p>
             <a href="/">← Back to dashboard</a>
             """
             
@@ -444,6 +447,9 @@ def create_simple_app(meeting_agent) -> Flask:
         try:
             meetings = app.meeting_agent.get_meeting_history(days_back=7)
             
+            # Calculate total cost
+            total_cost = sum(meeting.get('transcription_cost', 0.0) for meeting in meetings)
+            
             html = """
             <!DOCTYPE html>
             <html>
@@ -455,6 +461,7 @@ def create_simple_app(meeting_agent) -> Flask:
                     table { width: 100%; border-collapse: collapse; }
                     th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
                     th { background-color: #f2f2f2; }
+                    .summary { background: #f0f0f0; padding: 15px; border-radius: 5px; margin: 10px 0; }
                 </style>
             </head>
             <body>
@@ -462,11 +469,18 @@ def create_simple_app(meeting_agent) -> Flask:
                     <h1>📋 Meeting History</h1>
                     <p><a href="/">← Back to dashboard</a></p>
                     
+                    <div class="summary">
+                        <h3>Summary (Last 7 Days)</h3>
+                        <p><strong>Total Meetings:</strong> """ + str(len(meetings)) + """</p>
+                        <p><strong>Total Transcription Cost:</strong> $""" + f"{total_cost:.4f}" + """</p>
+                    </div>
+                    
                     <table>
                         <tr>
                             <th>Date</th>
                             <th>Name</th>
                             <th>Duration</th>
+                            <th>Transcription Cost</th>
                             <th>Status</th>
                         </tr>
             """
@@ -475,6 +489,7 @@ def create_simple_app(meeting_agent) -> Flask:
                 date_str = meeting.get('date', 'Unknown')
                 name = meeting.get('name', 'Unknown')
                 duration = meeting.get('duration_minutes', 0)
+                cost = meeting.get('transcription_cost', 0.0)
                 status = meeting.get('status', 'Unknown')
                 
                 html += f"""
@@ -482,6 +497,7 @@ def create_simple_app(meeting_agent) -> Flask:
                             <td>{date_str}</td>
                             <td>{name}</td>
                             <td>{duration} min</td>
+                            <td>${cost:.4f}</td>
                             <td>{status}</td>
                         </tr>
                 """

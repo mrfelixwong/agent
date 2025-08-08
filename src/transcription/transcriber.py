@@ -31,6 +31,9 @@ class Transcriber:
     for meeting recordings.
     """
     
+    # Whisper API pricing per minute (as of 2024)
+    WHISPER_COST_PER_MINUTE = 0.006  # $0.006 per minute
+    
     def __init__(self, api_key: Optional[str] = None, model: str = "whisper-1"):
         """
         Initialize transcriber
@@ -42,6 +45,10 @@ class Transcriber:
         self.model = model
         self.is_transcribing = False
         self.current_transcript = ""
+        
+        # Cost tracking
+        self.total_audio_duration = 0.0  # in seconds
+        self.total_cost = 0.0
         
         # Audio buffer for processing
         self._audio_chunks: List[bytes] = []
@@ -159,7 +166,17 @@ class Transcriber:
         self.is_transcribing = False
         
         logger.info("Transcription stopped")
+        logger.info(f"Total transcription cost: ${self.total_cost:.4f} for {self.total_audio_duration/60:.1f} minutes")
         return self.current_transcript
+    
+    def get_cost_info(self) -> Dict[str, float]:
+        """Get current cost information"""
+        return {
+            'total_duration_seconds': self.total_audio_duration,
+            'total_duration_minutes': self.total_audio_duration / 60.0,
+            'total_cost': self.total_cost,
+            'cost_per_minute': self.WHISPER_COST_PER_MINUTE
+        }
     
     def add_audio_chunk(self, audio_data: bytes) -> bool:
         """
@@ -247,8 +264,18 @@ class Transcriber:
                 temp_path = temp_file.name
             
             try:
+                # Calculate audio duration for this chunk
+                audio_duration = len(chunks_to_process) * 1024 / (self._sample_rate * self._channels * self._sample_width)
+                
                 # Transcribe audio chunk
                 transcript = self._transcribe_audio_file(temp_path)
+                
+                # Update cost tracking
+                self.total_audio_duration += audio_duration
+                chunk_cost = (audio_duration / 60.0) * self.WHISPER_COST_PER_MINUTE
+                self.total_cost += chunk_cost
+                
+                logger.info(f"Transcribed {audio_duration:.1f}s of audio (cost: ${chunk_cost:.4f})")
                 
                 if transcript and transcript.strip():
                     # Update current transcript
@@ -377,6 +404,10 @@ class MockTranscriber(Transcriber):
         self.is_transcribing = False
         self.current_transcript = ""
         
+        # Cost tracking (mock)
+        self.total_audio_duration = 0.0
+        self.total_cost = 0.0
+        
         # Audio buffer for compatibility with tests
         self._audio_buffer = io.BytesIO()
         
@@ -447,8 +478,21 @@ class MockTranscriber(Transcriber):
         
         return self.current_transcript
     
+    def get_cost_info(self) -> Dict[str, float]:
+        """Get current cost information (mock)"""
+        return {
+            'total_duration_seconds': self.total_audio_duration,
+            'total_duration_minutes': self.total_audio_duration / 60.0,
+            'total_cost': self.total_cost,
+            'cost_per_minute': 0.006
+        }
+    
     def add_audio_chunk(self, audio_data: bytes) -> bool:
         """Mock add audio chunk"""
+        # Simulate cost tracking
+        chunk_duration = len(audio_data) / (44100 * 2)  # Assume 44100Hz, 16-bit
+        self.total_audio_duration += chunk_duration
+        self.total_cost += (chunk_duration / 60.0) * 0.006
         return self.is_transcribing
     
     def _mock_processing_loop(self):
