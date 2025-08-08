@@ -11,7 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.main import MeetingAgent
-from src.web.app import create_simple_app
+from src.web.app import create_simple_app, create_app
 
 
 def start_web_interface():
@@ -25,10 +25,18 @@ def start_web_interface():
         agent = MeetingAgent(use_mock_components=True)  # Use mock for web demo
         print("✅ Meeting Agent initialized")
         
-        # Create simple web app (no templates needed)
+        # Create web app with SocketIO support for real-time transcript
         print("Creating web interface...")
-        app = create_simple_app(agent)
-        print("✅ Web interface created")
+        try:
+            app = create_app(meeting_agent=agent)
+            socketio = app.socketio
+            print("✅ Web interface with SocketIO created")
+            use_socketio = True
+        except ImportError:
+            # Fall back to simple app if Flask-SocketIO is not available
+            app = create_simple_app(agent)
+            print("✅ Simple web interface created (no real-time features)")
+            use_socketio = False
         
         print(f"\n🚀 Web Interface Starting!")
         print(f"📱 Open your browser to: http://localhost:5002")
@@ -38,9 +46,14 @@ def start_web_interface():
         print(f"• Start/stop meeting controls")
         print(f"• Meeting history")
         print(f"• System status")
+        if use_socketio:
+            print(f"• 🔴 Real-time transcript display during meetings")
         
         # Start the web server
-        app.run(host='localhost', port=5002, debug=False)
+        if use_socketio:
+            socketio.run(app, host='localhost', port=5002, debug=False, allow_unsafe_werkzeug=True)
+        else:
+            app.run(host='localhost', port=5002, debug=False)
         
     except KeyboardInterrupt:
         print(f"\n👋 Web server stopped")

@@ -531,8 +531,9 @@ class MockDatabase(Database):
         self._meetings[meeting_id] = meeting
         return meeting_id
     
-    def update_meeting_transcript(self, meeting_id: int, transcript: str) -> bool:
-        """Mock update transcript"""
+    def update_meeting_transcript(self, meeting_id: int, transcript: str, 
+                                 cost_info: Optional[Dict[str, float]] = None) -> bool:
+        """Mock update transcript with optional cost information"""
         if self._simulate_error:
             raise Exception("Simulated database error")
         
@@ -540,6 +541,12 @@ class MockDatabase(Database):
             self._meetings[meeting_id]['transcript'] = transcript
             self._meetings[meeting_id]['status'] = 'transcribed'
             self._meetings[meeting_id]['updated_at'] = datetime.now()
+            
+            # Add cost tracking if provided
+            if cost_info:
+                self._meetings[meeting_id]['transcription_cost'] = cost_info.get('total_cost', 0.0)
+                self._meetings[meeting_id]['transcription_duration'] = cost_info.get('total_duration_seconds', 0.0)
+            
             return True
         
         return False

@@ -31,8 +31,12 @@ def create_app(config: Optional[Dict[str, Any]] = None, meeting_agent=None) -> F
     # Initialize SocketIO for real-time updates
     socketio = SocketIO(app, cors_allowed_origins="*")
     
-    # Store reference to meeting agent
+    # Store reference to meeting agent and socketio
     app.meeting_agent = meeting_agent
+    
+    # Set socketio reference on meeting agent for transcript updates
+    if meeting_agent:
+        meeting_agent._socketio = socketio
     
     @app.route('/')
     def index():
@@ -315,6 +319,18 @@ def create_app(config: Optional[Dict[str, Any]] = None, meeting_agent=None) -> F
         except Exception as e:
             emit('error', {'message': str(e)})
     
+    @socketio.on('subscribe_transcript')
+    def handle_subscribe_transcript():
+        """Handle subscription to live transcript updates"""
+        logger.info("Client subscribed to live transcript updates")
+        emit('transcript_status', {'subscribed': True})
+    
+    @socketio.on('unsubscribe_transcript')
+    def handle_unsubscribe_transcript():
+        """Handle unsubscription from live transcript updates"""
+        logger.info("Client unsubscribed from live transcript updates")
+        emit('transcript_status', {'subscribed': False})
+    
     # Error handlers
     @app.errorhandler(404)
     def not_found(error):
@@ -354,6 +370,9 @@ def create_simple_app(meeting_agent) -> Flask:
                     .status {{ background: #f0f0f0; padding: 15px; border-radius: 5px; margin: 10px 0; }}
                     .button {{ background: #007cba; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }}
                     .button:hover {{ background: #005a8b; }}
+                    .button.stop {{ background: #dc3545; }}
+                    .button.stop:hover {{ background: #c82333; }}
+                    .recording-indicator {{ color: #dc3545; font-weight: bold; }}
                     .error {{ color: red; }}
                     .success {{ color: green; }}
                     input[type="text"] {{ padding: 8px; width: 200px; margin: 5px; }}
@@ -374,15 +393,34 @@ def create_simple_app(meeting_agent) -> Flask:
                     
                     <div class="controls">
                         <h3>Meeting Controls</h3>
-                        <form method="post" action="/start_meeting">
-                            <input type="text" name="meeting_name" placeholder="Meeting name..." required>
-                            <input type="text" name="participants" placeholder="Participants (comma-separated)">
-                            <button type="submit" class="button">Start Meeting</button>
-                        </form>
+                        <div id="start-meeting-form" style="{'display: none;' if status.get('status') == 'recording' else ''}">
+                            <form method="post" action="/start_meeting">
+                                <input type="text" name="meeting_name" placeholder="Meeting name..." required>
+                                <input type="text" name="participants" placeholder="Participants (comma-separated)">
+                                <button type="submit" class="button">Start Meeting</button>
+                            </form>
+                        </div>
                         
-                        <form method="post" action="/stop_meeting" style="display: inline;">
-                            <button type="submit" class="button">Stop Meeting</button>
-                        </form>
+                        <div id="stop-meeting-controls" style="{'display: block;' if status.get('status') == 'recording' else 'display: none;'}">
+                            <p class="recording-indicator">🔴 Recording: {status.get('meeting', {}).get('name', 'Unknown Meeting')}</p>
+                            <button type="button" class="button stop" onclick="stopMeetingAPI()">⏹️ Stop Recording</button>
+                        </div>
+                    </div>
+                    
+                    <div class="live-transcript" id="live-transcript" style="display: none;">
+                        <h3>Live Transcript</h3>
+                        <div class="transcript-controls">
+                            <button id="toggle-transcript" class="button">Show Transcript</button>
+                            <button id="clear-transcript" class="button">Clear</button>
+                            <span id="word-count">Words: 0</span>
+                        </div>
+                        <div id="transcript-content" style="background: #f9f9f9; border: 1px solid #ddd; padding: 10px; min-height: 200px; max-height: 300px; overflow-y: auto; margin: 10px 0;">
+                            <p id="transcript-text" style="margin: 0;"><em>Live transcript will appear here during meeting...</em></p>
+                        </div>
+                        <div class="transcript-status">
+                            <span id="connection-status" style="color: gray;">⚫ Disconnected</span>
+                            <span id="transcript-stats" style="float: right; font-size: 0.9em;"></span>
+                        </div>
                     </div>
                     
                     <div class="recent">
@@ -390,6 +428,140 @@ def create_simple_app(meeting_agent) -> Flask:
                         <p><a href="/meetings">View meeting history →</a></p>
                     </div>
                 </div>
+                
+                <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.4/socket.io.js"></script>
+                <script>
+                    // WebSocket connection for real-time transcript
+                    const socket = io();
+                    let transcriptVisible = false;
+                    let wordCount = 0;
+                    let isTranscribing = false;
+                    
+                    // DOM elements
+                    const liveTranscriptDiv = document.getElementById('live-transcript');
+                    const transcriptText = document.getElementById('transcript-text');
+                    const toggleBtn = document.getElementById('toggle-transcript');
+                    const clearBtn = document.getElementById('clear-transcript');
+                    const wordCountSpan = document.getElementById('word-count');
+                    const connectionStatus = document.getElementById('connection-status');
+                    const transcriptStats = document.getElementById('transcript-stats');
+                    
+                    // WebSocket event handlers
+                    socket.on('connect', function() {{
+                        connectionStatus.innerHTML = '🟢 Connected';
+                        connectionStatus.style.color = 'green';
+                        socket.emit('subscribe_transcript');
+                    }});
+                    
+                    socket.on('disconnect', function() {{
+                        connectionStatus.innerHTML = '⚫ Disconnected';
+                        connectionStatus.style.color = 'gray';
+                    }});
+                    
+                    socket.on('transcript_update', function(data) {{
+                        // Show transcript section if meeting is active
+                        if (!transcriptVisible && data.meeting_id) {{
+                            liveTranscriptDiv.style.display = 'block';
+                            transcriptVisible = true;
+                            toggleBtn.textContent = 'Hide Transcript';
+                        }}
+                        
+                        // Update transcript text
+                        if (data.is_final) {{
+                            if (transcriptText.innerHTML === '<em>Live transcript will appear here during meeting...</em>') {{
+                                transcriptText.innerHTML = '';
+                            }}
+                            transcriptText.innerHTML += data.text + ' ';
+                            
+                            // Auto-scroll to bottom
+                            const content = document.getElementById('transcript-content');
+                            content.scrollTop = content.scrollHeight;
+                        }}
+                        
+                        // Update stats
+                        wordCount = data.word_count || 0;
+                        wordCountSpan.textContent = 'Words: ' + wordCount;
+                        transcriptStats.textContent = 'Updated: ' + data.timestamp;
+                        isTranscribing = true;
+                    }});
+                    
+                    socket.on('meeting_status', function(data) {{
+                        // Update meeting controls visibility
+                        const startForm = document.getElementById('start-meeting-form');
+                        const stopControls = document.getElementById('stop-meeting-controls');
+                        
+                        if (data.status === 'recording') {{
+                            if (startForm) startForm.style.display = 'none';
+                            if (stopControls) stopControls.style.display = 'block';
+                        }} else {{
+                            if (startForm) startForm.style.display = 'block';
+                            if (stopControls) stopControls.style.display = 'none';
+                            
+                            // Hide transcript if no meeting is active
+                            if (transcriptVisible) {{
+                                transcriptStats.textContent = 'Meeting completed';
+                                isTranscribing = false;
+                            }}
+                        }}
+                    }});
+                    
+                    // Button event handlers
+                    toggleBtn.addEventListener('click', function() {{
+                        if (transcriptVisible) {{
+                            liveTranscriptDiv.style.display = 'none';
+                            toggleBtn.textContent = 'Show Transcript';
+                            transcriptVisible = false;
+                        }} else {{
+                            liveTranscriptDiv.style.display = 'block';
+                            toggleBtn.textContent = 'Hide Transcript';
+                            transcriptVisible = true;
+                        }}
+                    }});
+                    
+                    clearBtn.addEventListener('click', function() {{
+                        if (confirm('Clear the transcript display? (This won\\'t affect the actual recording)')) {{
+                            transcriptText.innerHTML = '<em>Transcript cleared...</em>';
+                            wordCount = 0;
+                            wordCountSpan.textContent = 'Words: 0';
+                        }}
+                    }});
+                    
+                    // Function to stop meeting via API
+                    function stopMeetingAPI() {{
+                        if (confirm('Are you sure you want to stop the current meeting?')) {{
+                            fetch('/api/stop_meeting', {{
+                                method: 'POST',
+                                headers: {{
+                                    'Content-Type': 'application/json',
+                                }},
+                                body: JSON.stringify({{}}),
+                            }})
+                            .then(response => response.json())
+                            .then(data => {{
+                                if (data.success) {{
+                                    alert('Meeting stopped successfully!');
+                                    // Refresh status
+                                    socket.emit('get_status');
+                                }} else {{
+                                    alert('Error stopping meeting: ' + (data.error || 'Unknown error'));
+                                }}
+                            }})
+                            .catch(error => {{
+                                console.error('Error:', error);
+                                alert('Failed to stop meeting. Please try again.');
+                            }});
+                        }}
+                    }}
+                    
+                    
+                    // Request initial status
+                    socket.emit('get_status');
+                    
+                    // Periodically check status
+                    setInterval(function() {{
+                        socket.emit('get_status');
+                    }}, 5000);
+                </script>
             </body>
             </html>
             """

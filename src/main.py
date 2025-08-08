@@ -164,6 +164,20 @@ class MeetingAgent:
                     logger.info(f"Transcript update: {text[:100]}...")
                 else:
                     logger.debug(f"Partial transcript: {text[:50]}...")
+                
+                # Emit transcript update via WebSocket if available
+                if hasattr(self, '_socketio') and self._socketio:
+                    try:
+                        self._socketio.emit('transcript_update', {
+                            'text': text,
+                            'timestamp': datetime.now().strftime('%H:%M:%S'),
+                            'is_final': is_final,
+                            'meeting_id': self.current_meeting.get('id'),
+                            'word_count': len(text.split()) if text else 0
+                        })
+                        logger.debug(f"Emitted transcript update via WebSocket: {len(text)} chars")
+                    except Exception as e:
+                        logger.warning(f"Failed to emit transcript update: {e}")
         
         self.transcriber.set_transcript_callback(on_transcript_update)
         
