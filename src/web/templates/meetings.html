@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Meeting History - Meeting Agent{% endblock %}
+
+{% block header %}Meeting History{% endblock %}
+
+{% block content %}
+<div class="meta-info">
+    <strong>Total Meetings:</strong> {{ meetings|length }}
+    {% if meetings %}
+    | <strong>Total Cost:</strong> ${{ "%.4f"|format(meetings|selectattr('transcription_cost')|map(attribute='transcription_cost')|sum) }}
+    {% endif %}
+</div>
+
+{% if meetings %}
+    {% for meeting in meetings %}
+    <div class="section">
+        <h3>
+            <span>
+                🎙️ {{ meeting.name }}
+                <small style="font-weight: normal; color: #6c757d;">
+                    {{ meeting.date }} • {{ meeting.duration_minutes or 0 }} min
+                    {% if meeting.transcription_cost %}
+                        • ${{ "%.4f"|format(meeting.transcription_cost) }}
+                    {% endif %}
+                </small>
+            </span>
+            <a href="/meetings/{{ meeting.id }}" class="button">View Details</a>
+        </h3>
+        
+        <div style="margin-top: 10px;">
+            <strong>Participants:</strong> 
+            {% if meeting.participants %}
+                {{ meeting.participants|join(', ') }}
+            {% else %}
+                No participants listed
+            {% endif %}
+        </div>
+        
+        {% if meeting.summary %}
+        <div style="margin-top: 10px;">
+            <strong>Summary:</strong>
+            {% if meeting.summary.executive_summary %}
+                {{ meeting.summary.executive_summary[:200] }}{% if meeting.summary.executive_summary|length > 200 %}...{% endif %}
+            {% else %}
+                Summary available
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <div style="margin-top: 10px;">
+            <span style="background: 
+                {% if meeting.status == 'completed' or meeting.status == 'summarized' %}#28a745
+                {% elif meeting.status == 'recording' %}#dc3545
+                {% elif meeting.status == 'transcribed' %}#ffc107
+                {% else %}#6c757d{% endif %}; 
+                color: white; 
+                padding: 3px 8px; 
+                border-radius: 3px; 
+                font-size: 0.8em;">
+                {{ meeting.status|upper }}
+            </span>
+            {% if meeting.action_items and meeting.action_items|length > 0 %}
+                <span style="margin-left: 10px; color: #dc3545;">
+                    ✅ {{ meeting.action_items|length }} Action Item{{ 's' if meeting.action_items|length != 1 else '' }}
+                </span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="alert alert-info">
+        <h3>No meetings found</h3>
+        <p>Start your first meeting from the <a href="/">dashboard</a>.</p>
+    </div>
+{% endif %}
+
+<div style="margin-top: 30px; text-align: center;">
+    <a href="/" class="button secondary">← Back to Dashboard</a>
+</div>
+{% endblock %}

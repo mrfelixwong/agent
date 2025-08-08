@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Error - Meeting Agent{% endblock %}
+
+{% block header %}Error{% endblock %}
+
+{% block content %}
+<div class="alert alert-error">
+    <h3>❌ Something went wrong</h3>
+    <p><strong>Error:</strong> {{ error }}</p>
+</div>
+
+<div style="margin-top: 20px;">
+    <a href="/" class="button">← Back to Dashboard</a>
+    <a href="/meetings" class="button secondary">Meeting History</a>
+</div>
+
+<details style="margin-top: 20px;">
+    <summary style="cursor: pointer;">Troubleshooting Tips</summary>
+    <div style="padding: 10px; background: #f8f9fa; margin-top: 10px; border-radius: 4px;">
+        <ul>
+            <li>Try refreshing the page</li>
+            <li>Check if the Meeting Agent is running properly</li>
+            <li>Verify the meeting ID is correct</li>
+            <li>Check the server logs for more details</li>
+        </ul>
+    </div>
+</details>
+{% endblock %}

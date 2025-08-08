@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}{{ meeting.name }} - Meeting Agent{% endblock %}
+
+{% block header %}{{ meeting.name }}{% endblock %}
+
+{% block content %}
+<div class="meta-info">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+        <div><strong>Date:</strong> {{ meeting.date }}</div>
+        <div><strong>Duration:</strong> {{ meeting.duration_minutes or 0 }} minutes</div>
+        <div><strong>Participants:</strong> {{ meeting.participants|join(', ') if meeting.participants else 'None listed' }}</div>
+        {% if meeting.transcription_cost %}
+        <div><strong>Transcription Cost:</strong> ${{ "%.4f"|format(meeting.transcription_cost) }}</div>
+        {% endif %}
+        <div><strong>Status:</strong> 
+            <span style="background: 
+                {% if meeting.status == 'completed' or meeting.status == 'summarized' %}#28a745
+                {% elif meeting.status == 'recording' %}#dc3545
+                {% elif meeting.status == 'transcribed' %}#ffc107
+                {% else %}#6c757d{% endif %}; 
+                color: white; 
+                padding: 2px 6px; 
+                border-radius: 3px; 
+                font-size: 0.85em;">
+                {{ meeting.status|upper }}
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Copy for ChatGPT -->
+<div class="section">
+    <h3>
+        <span>🤖 ChatGPT Ready Format</span>
+        <button class="button copy" onclick="copyToClipboard(getChatGPTFormat(), this)">
+            📋 Copy for ChatGPT
+        </button>
+    </h3>
+    <p>One-click copy in perfect format for ChatGPT analysis:</p>
+    <div class="copy-format" id="chatgpt-format">{{ getChatGPTText() }}</div>
+</div>
+
+{% if meeting.summary %}
+<!-- Executive Summary -->
+<div class="section">
+    <h3>
+        <span>📋 Executive Summary</span>
+        <button class="button copy" onclick="copyToClipboard(document.getElementById('exec-summary').textContent, this)">
+            📋 Copy Summary
+        </button>
+    </h3>
+    <div id="exec-summary">{{ meeting.summary.executive_summary or 'No executive summary available' }}</div>
+</div>
+
+<!-- Key Points -->
+{% if meeting.summary.key_points %}
+<div class="section">
+    <h3>
+        <span>🎯 Key Points</span>
+        <button class="button copy" onclick="copyToClipboard(getKeyPointsText(), this)">
+            📋 Copy Key Points
+        </button>
+    </h3>
+    <ul>
+        {% for point in meeting.summary.key_points %}
+        <li>{{ point }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<!-- Decisions Made -->
+{% if meeting.summary.decisions_made %}
+<div class="section">
+    <h3>
+        <span>⚡ Decisions Made</span>
+        <button class="button copy" onclick="copyToClipboard(getDecisionsText(), this)">
+            📋 Copy Decisions
+        </button>
+    </h3>
+    <ul>
+        {% for decision in meeting.summary.decisions_made %}
+        <li>{{ decision }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<!-- Action Items -->
+{% if meeting.action_items or (meeting.summary and meeting.summary.action_items) %}
+<div class="section">
+    <h3>
+        <span>✅ Action Items</span>
+        <button class="button copy" onclick="copyToClipboard(getActionItemsText(), this)">
+            📋 Copy Action Items
+        </button>
+    </h3>
+    {% set action_items = meeting.action_items or meeting.summary.action_items %}
+    {% for item in action_items %}
+    <div class="action-item">
+        <strong>{{ item.assignee or 'Unassigned' }}:</strong> {{ item.task or item.description or item }}
+        {% if item.due_date %}<br><small>Due: {{ item.due_date }}</small>{% endif %}
+        {% if item.priority %}<br><small>Priority: {{ item.priority }}</small>{% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Next Steps -->
+{% if meeting.summary and meeting.summary.next_steps %}
+<div class="section">
+    <h3>
+        <span>🚀 Next Steps</span>
+        <button class="button copy" onclick="copyToClipboard(getNextStepsText(), this)">
+            📋 Copy Next Steps
+        </button>
+    </h3>
+    <ul>
+        {% for step in meeting.summary.next_steps %}
+        <li>{{ step }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{% endif %}
+
+<!-- Full Transcript -->
+{% if meeting.transcript %}
+<div class="section">
+    <h3>
+        <span>📄 Full Transcript</span>
+        <button class="button copy" onclick="copyToClipboard(document.getElementById('full-transcript').textContent, this)">
+            📋 Copy Transcript
+        </button>
+    </h3>
+    <details>
+        <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px;">
+            Click to expand transcript ({{ meeting.transcript|length }} characters)
+        </summary>
+        <div class="copy-format" id="full-transcript" style="margin-top: 10px;">{{ meeting.transcript }}</div>
+    </details>
+</div>
+{% endif %}
+
+<!-- Export Options -->
+<div class="section">
+    <h3>📤 Export Options</h3>
+    <div>
+        <button class="button" onclick="exportAsMarkdown()">📝 Export as Markdown</button>
+        <button class="button" onclick="exportAsJSON()">🔧 Export as JSON</button>
+        <a href="/meetings" class="button secondary">← Back to Meeting List</a>
+    </div>
+</div>
+
+<script>
+    // Meeting data for JavaScript functions
+    const meetingData = {{ meeting|tojson }};
+    
+    function getChatGPTFormat() {
+        return document.getElementById('chatgpt-format').textContent;
+    }
+    
+    function getKeyPointsText() {
+        {% if meeting.summary and meeting.summary.key_points %}
+        return {{ meeting.summary.key_points|join('\n• ')|tojson }}.replace(/^/, '• ');
+        {% else %}
+        return 'No key points available';
+        {% endif %}
+    }
+    
+    function getDecisionsText() {
+        {% if meeting.summary and meeting.summary.decisions_made %}
+        return {{ meeting.summary.decisions_made|join('\n• ')|tojson }}.replace(/^/, '• ');
+        {% else %}
+        return 'No decisions recorded';
+        {% endif %}
+    }
+    
+    function getActionItemsText() {
+        {% if meeting.action_items or (meeting.summary and meeting.summary.action_items) %}
+        {% set action_items = meeting.action_items or meeting.summary.action_items %}
+        let items = [];
+        {% for item in action_items %}
+        items.push('• {{ (item.assignee or "Unassigned") + ": " + (item.task or item.description or item) }}');
+        {% endfor %}
+        return items.join('\n');
+        {% else %}
+        return 'No action items';
+        {% endif %}
+    }
+    
+    function getNextStepsText() {
+        {% if meeting.summary and meeting.summary.next_steps %}
+        return {{ meeting.summary.next_steps|join('\n• ')|tojson }}.replace(/^/, '• ');
+        {% else %}
+        return 'No next steps defined';
+        {% endif %}
+    }
+    
+    function exportAsMarkdown() {
+        let markdown = `# ${meetingData.name}\n\n`;
+        markdown += `**Date:** ${meetingData.date}\n`;
+        markdown += `**Duration:** ${meetingData.duration_minutes || 0} minutes\n`;
+        markdown += `**Participants:** ${(meetingData.participants || []).join(', ') || 'None listed'}\n\n`;
+        
+        {% if meeting.summary %}
+        {% if meeting.summary.executive_summary %}
+        markdown += `## Executive Summary\n\n${meetingData.summary.executive_summary}\n\n`;
+        {% endif %}
+        
+        {% if meeting.summary.key_points %}
+        markdown += `## Key Points\n\n`;
+        meetingData.summary.key_points.forEach(point => markdown += `- ${point}\n`);
+        markdown += '\n';
+        {% endif %}
+        
+        {% if meeting.summary.decisions_made %}
+        markdown += `## Decisions Made\n\n`;
+        meetingData.summary.decisions_made.forEach(decision => markdown += `- ${decision}\n`);
+        markdown += '\n';
+        {% endif %}
+        
+        {% if meeting.action_items or (meeting.summary and meeting.summary.action_items) %}
+        markdown += `## Action Items\n\n`;
+        const actionItems = meetingData.action_items || meetingData.summary.action_items;
+        actionItems.forEach(item => {
+            const assignee = item.assignee || 'Unassigned';
+            const task = item.task || item.description || item;
+            markdown += `- **${assignee}:** ${task}\n`;
+        });
+        markdown += '\n';
+        {% endif %}
+        {% endif %}
+        
+        const blob = new Blob([markdown], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${meetingData.name.replace(/[^a-z0-9]/gi, '_')}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+    
+    function exportAsJSON() {
+        const blob = new Blob([JSON.stringify(meetingData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${meetingData.name.replace(/[^a-z0-9]/gi, '_')}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Generate ChatGPT-optimized format
+    document.getElementById('chatgpt-format').textContent = `MEETING SUMMARY - ${meetingData.name} (${meetingData.date})
+
+CONTEXT:
+Meeting with ${(meetingData.participants || []).length} participant${(meetingData.participants || []).length !== 1 ? 's' : ''}, ${meetingData.duration_minutes || 0} minutes duration
+
+{% if meeting.summary and meeting.summary.decisions_made %}
+KEY DECISIONS:
+{% for decision in meeting.summary.decisions_made %}
+- {{ decision }}{% endfor %}
+
+{% endif %}
+{% if meeting.action_items or (meeting.summary and meeting.summary.action_items) %}
+ACTION ITEMS:
+{% set action_items = meeting.action_items or meeting.summary.action_items %}
+{% for item in action_items %}
+- {{ (item.assignee or 'Unassigned') + ': ' + (item.task or item.description or item) }}{% endfor %}
+
+{% endif %}
+{% if meeting.summary and meeting.summary.key_points %}
+DISCUSSION POINTS:
+{% for point in meeting.summary.key_points %}
+- {{ point }}{% endfor %}
+
+{% endif %}
+Please help me analyze this meeting and suggest:
+1. Risk mitigation strategies for any issues discussed
+2. Follow-up questions for next steps
+3. Resource allocation recommendations`;
+</script>
+{% endblock %}
