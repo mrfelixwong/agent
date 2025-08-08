@@ -64,3 +64,26 @@ def setup_logger(name: str, log_file: Optional[str] = None, level: str = "INFO")
 def get_logger(name: str) -> logging.Logger:
     """Get existing logger by name"""
     return logging.getLogger(name)
+
+
+def log_performance(func):
+    """Decorator to log function execution time"""
+    import time
+    import functools
+    
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        logger = logging.getLogger(func.__module__)
+        start_time = time.time()
+        
+        try:
+            result = func(*args, **kwargs)
+            execution_time = time.time() - start_time
+            logger.debug(f"{func.__name__} completed in {execution_time:.3f}s")
+            return result
+        except Exception as e:
+            execution_time = time.time() - start_time
+            logger.debug(f"{func.__name__} failed after {execution_time:.3f}s: {e}")
+            raise
+            
+    return wrapper

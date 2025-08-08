@@ -129,6 +129,8 @@ class Database:
         Returns:
             Meeting ID
         """
+        logger.debug(f"Saving meeting: {name} with {len(participants or [])} participants")
+        
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             

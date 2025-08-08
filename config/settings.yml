@@ -34,7 +34,7 @@ audio:
 
 # Logging Configuration
 logging:
-  level: INFO
+  level: DEBUG
   file: logs/meeting_agent.log
 
 # Meeting Configuration

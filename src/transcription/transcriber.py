@@ -245,19 +245,24 @@ class Transcriber:
             # Get buffered audio chunks
             with self._buffer_lock:
                 if not self._audio_chunks:
+                    logger.debug("No audio chunks to process")
                     return  # No data to process
                 
                 # Take all current chunks and clear buffer
                 chunks_to_process = self._audio_chunks.copy()
                 self._audio_chunks.clear()
             
+            logger.debug(f"Processing {len(chunks_to_process)} audio chunks")
+            
             if len(chunks_to_process) < 2:  # Need at least 2 chunks for meaningful transcription
+                logger.debug("Not enough chunks for transcription (need at least 2)")
                 return
             
             # Create WAV file from audio chunks
             wav_data = self._create_wav_from_chunks(chunks_to_process)
             
             if len(wav_data) < 1000:  # Skip very small files
+                logger.debug(f"Skipping small WAV file ({len(wav_data)} bytes)")
                 return
             
             # Create temporary WAV file for Whisper API
@@ -269,15 +274,20 @@ class Transcriber:
                 # Calculate audio duration for this chunk
                 audio_duration = len(chunks_to_process) * 1024 / (self._sample_rate * self._channels * self._sample_width)
                 
+                logger.debug(f"Sending {audio_duration:.1f}s of audio to Whisper API")
+                
                 # Transcribe audio chunk
+                start_time = time.time()
                 transcript = self._transcribe_audio_file(temp_path)
+                api_time = time.time() - start_time
                 
                 # Update cost tracking
                 self.total_audio_duration += audio_duration
                 chunk_cost = (audio_duration / 60.0) * self.cost_per_minute
                 self.total_cost += chunk_cost
                 
-                logger.info(f"Transcribed {audio_duration:.1f}s of audio (cost: ${chunk_cost:.4f})")
+                logger.info(f"Transcribed {audio_duration:.1f}s of audio (cost: ${chunk_cost:.4f}, API time: {api_time:.2f}s)")
+                logger.debug(f"Transcript length: {len(transcript)} characters")
                 
                 if transcript and transcript.strip():
                     # Update current transcript

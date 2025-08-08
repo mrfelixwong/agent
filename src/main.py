@@ -187,6 +187,8 @@ class MeetingAgent:
             raise ValueError("A meeting is already being recorded")
             
         logger.info(f"Starting meeting: {meeting_name}")
+        logger.debug(f"Audio config: {self.config.get('audio', {})}")
+        logger.debug(f"Using transcription model: {self.config.get('openai.transcription_model', 'whisper-1')}")
         
         try:
             # Create meeting record in database

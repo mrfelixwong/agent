@@ -54,10 +54,14 @@ def load_config(config_path: Optional[str] = None, validate_secrets: bool = True
     # Load settings from YAML file first
     if os.path.exists(config_path):
         try:
+            print(f"Loading configuration from {config_path}")
             with open(config_path, 'r') as f:
                 config = yaml.safe_load(f) or {}
+            print(f"Loaded {len(config)} configuration sections")
         except Exception as e:
             print(f"Warning: Could not load config file {config_path}: {e}")
+    else:
+        print(f"Configuration file not found: {config_path}")
     
     # Add secrets from environment variables
     # These override any values from the YAML file for security

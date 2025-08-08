@@ -13,7 +13,7 @@ try:
 except ImportError:
     openai = None
 
-from ..utils.logger import setup_logger
+from ..utils.logger import setup_logger, log_performance
 
 logger = setup_logger(__name__)
 
@@ -61,6 +61,7 @@ class Summarizer:
         
         logger.info(f"Summarizer initialized with model: {model}")
     
+    @log_performance
     def summarize_meeting(
         self, 
         transcript: str, 
