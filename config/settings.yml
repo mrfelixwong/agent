@@ -1,0 +1,47 @@
+# Meeting Agent Configuration File
+# This file contains default settings that can be overridden by environment variables
+
+# OpenAI API Configuration
+openai:
+  api_key: ${OPENAI_API_KEY}  # Set in environment or .env file
+
+# Email Configuration
+email:
+  address: ${EMAIL_ADDRESS}
+  password: ${EMAIL_PASSWORD}
+  smtp_server: smtp.gmail.com
+  smtp_port: 587
+  daily_summary_time: "22:00"
+
+# Web Interface Configuration
+web:
+  host: ${WEB_HOST:-localhost}
+  port: ${WEB_PORT:-5002}
+  secret_key: ${SECRET_KEY:-default-secret}
+  debug: ${FLASK_DEBUG:-false}
+
+# Database Configuration
+database:
+  url: sqlite:///data/database.db
+
+# Audio Recording Configuration
+audio:
+  sample_rate: 44100
+  channels: 1
+  format: 16bit
+
+# Logging Configuration
+logging:
+  level: INFO
+  file: logs/meeting_agent.log
+
+# Meeting Configuration
+meeting:
+  max_duration_hours: 8
+  auto_save_interval_seconds: 30
+  transcript_chunk_size: 1000
+
+# Email Templates
+templates:
+  meeting_summary: "config/email_templates/meeting_summary.html"
+  daily_digest: "config/email_templates/daily_digest.html"

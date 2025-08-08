@@ -1,0 +1,26 @@
+# Meeting Agent Configuration
+# Using environment variables where available
+
+openai:
+  api_key: "${OPENAI_API_KEY}"
+  transcription_model: "whisper-1"
+  summarization_model: "gpt-4"
+
+email:
+  address: "test@example.com"  # Will use mock for now
+  password: "mock-password"    # Will use mock for now  
+  smtp_server: "smtp.gmail.com"
+  smtp_port: 587
+
+database:
+  path: "data/meetings.db"
+
+audio:
+  sample_rate: 44100
+  channels: 1
+  chunk_size: 1024
+
+web:
+  secret_key: "${WEB_SECRET_KEY:-meeting-agent-secret-key}"
+  host: "${WEB_HOST:-localhost}"
+  port: "${WEB_PORT:-5002}"
