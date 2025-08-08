@@ -1,214 +1,260 @@
 # Meeting Agent
 
-An intelligent meeting assistant that automatically records, transcribes, and summarizes your meetings with daily email reports.
+An intelligent meeting assistant that records, transcribes, and summarizes meetings with real-time transcript display, cost tracking, and ChatGPT-ready export functionality.
 
-## Features
+## 🚀 Features
 
-- **Automatic Meeting Detection**: Integrates with calendar systems to detect upcoming meetings
-- **Audio Recording**: Records meeting audio with participant consent
-- **Real-time Transcription**: Converts speech to text using advanced AI models
-- **AI-Powered Summaries**: Generates concise meeting summaries with key points
-- **Action Item Extraction**: Identifies and tracks action items and decisions
-- **Daily Email Reports**: Sends comprehensive daily summaries via email
-- **Privacy-First**: Local processing with optional cloud AI integration
+- **Real-time Recording**: Start/stop meetings with live transcript display
+- **AI-Powered Transcription**: Using OpenAI Whisper with cost tracking
+- **Smart Summaries**: Automatic meeting summaries with key points and action items
+- **ChatGPT Integration**: One-click copy for AI-powered meeting analysis
+- **Web Interface**: Clean dashboard with meeting history and detailed views
+- **Cost Tracking**: Monitor transcription costs ($0.006/minute)
+- **Export Options**: Markdown, JSON, and clipboard-ready formats
 
-## Architecture
+## 🎯 Quick Start
+
+### 1. Setup Environment Variables
+
+Add these secrets to your `~/.zshrc` (never use `.env` files):
+
+```bash
+# Required API keys
+export OPENAI_API_KEY="your_openai_api_key_here"
+export EMAIL_ADDRESS="your_email@example.com"
+export EMAIL_PASSWORD="your_app_specific_password"
+
+# Optional
+export SECRET_KEY="your_web_session_key"
+```
+
+Then reload: `source ~/.zshrc`
+
+### 2. Install Dependencies
+
+```bash
+git clone <your-repo-url>
+cd agent
+pip install -r requirements.txt
+pip install flask-socketio  # For real-time features
+```
+
+### 3. Run the Application
+
+```bash
+# Start web interface (recommended)
+python start_web.py
+
+# Or run CLI version
+python production_cli.py
+```
+
+Visit **http://localhost:5002** for the web dashboard.
+
+## 🖥️ Web Interface
+
+### Dashboard
+- **Start/Stop Recording**: Simple meeting controls
+- **Live Transcript**: Real-time text display during meetings
+- **Connection Status**: WebSocket connectivity indicator
+- **Cost Tracking**: Live transcription cost monitoring
+
+### Meeting Management
+- **Meeting History**: View all past meetings with status and costs
+- **Detailed Views**: Rich meeting summaries with structured data
+- **Copy for ChatGPT**: One-click export in AI-friendly format
+- **Export Options**: Download as Markdown or JSON
+
+### Key Workflows
+
+1. **Record Meeting**: Click "Start Meeting" → enter name → see live transcript
+2. **Stop & Review**: Click "Stop Recording" → automatic summary generation  
+3. **Analyze with AI**: Open meeting details → "Copy for ChatGPT" → paste to AI
+4. **Export Data**: Use Markdown export for documentation or sharing
+
+## 📋 Meeting Summary Format
+
+The ChatGPT export creates perfectly formatted summaries:
+
+```
+MEETING SUMMARY - Weekly Standup (2025-01-15)
+
+CONTEXT:
+Meeting with 3 participants, 45 minutes duration
+
+KEY DECISIONS:
+- Move project deadline to January 25th
+- Allocate $5,000 for external design contractor
+
+ACTION ITEMS:
+- Alice: Complete design mockups by January 20th
+- Bob: Review security audit by January 18th
+
+DISCUSSION POINTS:
+- Timeline concerns due to design complexity
+- Budget discussion for additional resources
+
+Please help me analyze this meeting and suggest:
+1. Risk mitigation for the delayed timeline
+2. Follow-up questions for the client meeting
+3. Resource allocation recommendations
+```
+
+## ⚙️ Configuration
+
+### Settings File: `config/settings.yml`
+
+Non-sensitive settings (safe to commit):
+
+```yaml
+# Web Interface
+web:
+  host: localhost
+  port: 5002
+
+# Audio Recording  
+audio:
+  sample_rate: 44100
+  channels: 1  # Mono for better compatibility
+
+# OpenAI Models
+openai:
+  transcription_model: "whisper-1" 
+  summarization_model: "gpt-4"
+
+# Cost Tracking
+cost:
+  whisper_per_minute: 0.006  # USD per minute
+```
+
+### Environment Variables
+
+Secrets (add to `~/.zshrc`):
+
+- `OPENAI_API_KEY`: Required for transcription and summarization
+- `EMAIL_ADDRESS`: For sending meeting summaries
+- `EMAIL_PASSWORD`: App-specific password for email
+- `SECRET_KEY`: Web session security (optional)
+
+## 🏗️ Architecture
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Calendar      │    │  Audio Capture  │    │  Transcription  │
-│   Integration   │───▶│     System      │───▶│    Service      │
+│  Web Dashboard  │    │  Meeting Agent  │    │  OpenAI APIs    │
+│  (port 5002)    │◀──▶│   (main.py)     │◀──▶│  (Whisper/GPT)  │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                                              │
-         ▼                                              ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Scheduling    │    │   AI Summary    │    │    Database     │
-│    Service      │    │   Generation    │◀───│    Storage      │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │
-         ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐
-│ Email Service   │    │  Web Dashboard  │
-│ (Daily Reports) │    │   (Optional)    │
-└─────────────────┘    └─────────────────┘
+         │                       │                       
+         ▼                       ▼                       
+┌─────────────────┐    ┌─────────────────┐              
+│  Real-time UI   │    │  SQLite DB      │              
+│  (WebSocket)    │    │  (meetings.db)  │              
+└─────────────────┘    └─────────────────┘              
 ```
 
-## Quick Start
+### Key Components
 
-1. **Install Dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+- **Meeting Agent** (`src/main.py`): Core orchestrator
+- **Web Interface** (`src/web/app.py`): Flask app with SocketIO
+- **Transcriber** (`src/transcription/transcriber.py`): Real-time speech-to-text
+- **Database** (`src/database/database.py`): Meeting storage with cost tracking
+- **Templates** (`src/web/templates/`): Structured meeting views
 
-2. **Configure Settings**:
-   ```bash
-   cp config/settings.example.yml config/settings.yml
-   # Edit with your API keys and preferences
-   ```
+## 📊 Project Structure
 
-3. **Run the Agent**:
-   ```bash
-   python src/main.py
-   ```
-
-4. **Web Interface** (Optional):
-   ```bash
-   python src/web_app.py
-   # Visit http://localhost:5000
-   ```
-
-## Configuration
-
-### Required Settings
-- **OpenAI API Key**: For transcription and summarization
-- **Email SMTP**: For sending daily reports
-- **Calendar Integration**: Google Calendar, Outlook, etc.
-
-### Optional Integrations
-- **Zoom SDK**: For automatic Zoom meeting recording
-- **Microsoft Teams**: Teams meeting integration
-- **Slack**: Slack huddle and meeting support
-
-## Privacy & Compliance
-
-- All audio processing can be done locally
-- Transcripts encrypted at rest
-- GDPR and privacy regulation compliant
-- Participant consent management
-- Data retention policies configurable
-
-## Usage Examples
-
-### Manual Meeting Recording
-```python
-from src.meeting_recorder import MeetingRecorder
-
-recorder = MeetingRecorder()
-meeting_id = recorder.start_recording("Team Standup")
-# ... meeting happens ...
-summary = recorder.stop_and_summarize(meeting_id)
-```
-
-### Calendar Integration
-```python
-from src.calendar_integration import CalendarWatcher
-
-watcher = CalendarWatcher()
-watcher.start_monitoring()  # Automatically handles upcoming meetings
-```
-
-## Email Report Examples
-
-### Individual Meeting Summary
-```
-Subject: Meeting Summary: Product Planning Session
-
-Meeting: Product Planning Session
-Date: March 15, 2024, 2:00 PM - 3:30 PM
-Participants: Alice Johnson, Bob Smith, Carol Davis
-
-## Key Discussion Points
-• Q2 feature roadmap priorities
-• Resource allocation for new initiatives
-• Customer feedback integration process
-
-## Decisions Made
-• Move forward with mobile app redesign
-• Allocate 2 additional developers to Project Phoenix
-• Implement weekly customer feedback reviews
-
-## Action Items
-• Alice: Create detailed mobile app wireframes (Due: March 22)
-• Bob: Hire 2 senior developers (Due: April 1)  
-• Carol: Set up customer feedback pipeline (Due: March 20)
-
-## Next Steps
-• Follow-up meeting scheduled for March 22
-• Review progress on action items
-```
-
-### Daily Summary Report
-```
-Subject: Daily Meeting Summary - March 15, 2024
-
-You had 4 meetings today totaling 5 hours and 30 minutes.
-
-## Meeting Overview
-1. **Team Standup** (30 min) - Routine check-in, no action items
-2. **Product Planning** (90 min) - Major decisions on Q2 roadmap
-3. **Client Call - Acme Corp** (60 min) - Requirements gathering
-4. **Budget Review** (90 min) - Q1 spending analysis
-
-## Top Action Items Across All Meetings
-1. Create mobile app wireframes (Due: March 22)
-2. Prepare Q1 budget variance report (Due: March 18)
-3. Schedule Acme Corp follow-up (Due: March 16)
-4. Review developer hiring plan (Due: April 1)
-
-## Key Themes
-• **Resource Planning**: Multiple discussions about team expansion
-• **Customer Focus**: Emphasis on user feedback and client needs  
-• **Q2 Preparation**: Strategic planning for next quarter initiatives
-
-## Meeting Efficiency Score: 8.2/10
-Based on: Action item clarity, decision making, time management
-```
-
-## Development
-
-### Project Structure
 ```
 agent/
-├── src/
-│   ├── main.py                 # Main application entry
-│   ├── meeting_recorder.py     # Audio recording logic
-│   ├── transcription.py        # Speech-to-text service
-│   ├── summarization.py        # AI-powered summarization
-│   ├── email_service.py        # Email notification system
-│   ├── calendar_integration.py # Calendar API integrations
-│   ├── database.py             # Data storage layer
-│   └── web_app.py              # Optional web interface
+├── src/                     # Main application code
+│   ├── main.py             # Meeting Agent orchestrator
+│   ├── web/                # Web interface
+│   │   ├── app.py         # Flask app with templates
+│   │   └── templates/     # HTML templates
+│   ├── transcription/     # Speech-to-text
+│   ├── database/          # Data storage
+│   └── utils/             # Configuration, logging
 ├── config/
-│   ├── settings.yml            # Main configuration
-│   └── email_templates/        # Email template files
-├── tests/                      # Test suite
-├── docs/                       # Additional documentation
-└── scripts/                    # Utility scripts
+│   └── settings.yml       # Non-sensitive configuration
+├── start_web.py          # Web interface launcher
+├── production_cli.py     # CLI interface
+└── CLAUDE.md            # AI assistant instructions
 ```
 
-### Technology Stack
-- **Python 3.9+**: Core application
-- **OpenAI Whisper**: Speech transcription
-- **OpenAI GPT**: Text summarization
-- **SQLite/PostgreSQL**: Data storage
-- **APScheduler**: Task scheduling
-- **Flask**: Web interface (optional)
-- **SMTP**: Email delivery
+## 🧪 Testing
 
-## Deployment
-
-### Local Development
 ```bash
-git clone <repository>
-cd agent
-python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
-pip install -r requirements.txt
+# Test web interface (uses mock components)
+python test_web.py
+
+# Test core functionality
+python -c "
+from src.main import MeetingAgent
+agent = MeetingAgent(use_mock_components=True)
+meeting = agent.start_meeting('Test Meeting')
+print('✅ Meeting started:', meeting['name'])
+agent.cleanup()
+"
 ```
 
-### Production Deployment
-- Docker container available
-- Supports deployment to AWS, GCP, Azure
-- Can run as system service/daemon
-- Kubernetes manifests included
+## 🎨 Features Showcase
 
-## License
+### Real-time Transcript Display
+- Live text updates during meetings
+- Auto-scrolling with word count tracking
+- Connection status indicators
+- Toggle visibility controls
+
+### Smart Meeting Management  
+- Status indicators (Recording, Completed, etc.)
+- Cost tracking with running totals
+- Participant management
+- Duration monitoring
+
+### ChatGPT-Ready Export
+- Pre-formatted for AI analysis
+- Structured sections (Decisions, Action Items, etc.)
+- Context-rich formatting
+- One-click clipboard copy
+
+### Professional UI
+- Clean, responsive design
+- Consistent navigation
+- Professional styling
+- Mobile-friendly layout
+
+## 🔧 Development
+
+### Mock vs Real Components
+- **Development**: Use `use_mock_components=True` for testing without API keys
+- **Production**: Use real components with environment variables set
+
+### Adding Features
+1. Follow hybrid approach: simple for basic features, structured for complex data
+2. Document alternatives considered and reasoning
+3. Maintain cost tracking for any transcription features
+4. Test with both mock and real components
+
+## 💡 Future Ideas
+
+- **Desktop App**: System tray application for easier startup
+- **Mobile App**: React Native or Flutter companion app
+- **Calendar Integration**: Automatic meeting detection
+- **Team Features**: Multi-user support and permissions
+- **Advanced Analytics**: Meeting efficiency scoring
+
+## 📝 License
 
 MIT License - see LICENSE file for details.
 
-## Support
+## 🛠️ Troubleshooting
 
-For issues and questions:
-- Create GitHub issue
-- Check documentation in `/docs`
-- Email: support@meetingagent.com
+### Common Issues
+
+1. **Port 5002 in use**: Change port in `config/settings.yml`
+2. **Missing API keys**: Check `~/.zshrc` and run `source ~/.zshrc`
+3. **Template errors**: Ensure `src/web/templates/` directory exists
+4. **WebSocket issues**: Check if Flask-SocketIO is installed
+
+### Getting Help
+
+- Check logs in `logs/meeting_agent.log` (if enabled)
+- Use debug mode: Set `logging.level: DEBUG` in `config/settings.yml`
+- Test with mock components first: `use_mock_components=True`
