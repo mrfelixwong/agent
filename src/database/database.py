@@ -11,6 +11,7 @@ from datetime import datetime, date
 from pathlib import Path
 
 from ..utils.logger import setup_logger
+from ..utils.data_helpers import parse_meeting_json_fields
 from ..utils.helpers import ensure_directory
 
 logger = setup_logger(__name__)
@@ -231,14 +232,7 @@ class Database:
                 meeting = dict(row)
                 
                 # Parse JSON fields
-                if meeting['participants']:
-                    meeting['participants'] = json.loads(meeting['participants'])
-                if meeting['summary']:
-                    meeting['summary'] = json.loads(meeting['summary'])
-                if meeting['action_items']:
-                    meeting['action_items'] = json.loads(meeting['action_items'])
-                
-                return meeting
+                return parse_meeting_json_fields(meeting)
             
             return None
     
@@ -258,13 +252,7 @@ class Database:
                 meeting = dict(row)
                 
                 # Parse JSON fields
-                if meeting['participants']:
-                    meeting['participants'] = json.loads(meeting['participants'])
-                if meeting['summary']:
-                    meeting['summary'] = json.loads(meeting['summary'])
-                if meeting['action_items']:
-                    meeting['action_items'] = json.loads(meeting['action_items'])
-                
+                meeting = parse_meeting_json_fields(meeting)
                 meetings.append(meeting)
             
             return meetings
@@ -285,13 +273,7 @@ class Database:
                 meeting = dict(row)
                 
                 # Parse JSON fields
-                if meeting['participants']:
-                    meeting['participants'] = json.loads(meeting['participants'])
-                if meeting['summary']:
-                    meeting['summary'] = json.loads(meeting['summary'])
-                if meeting['action_items']:
-                    meeting['action_items'] = json.loads(meeting['action_items'])
-                
+                meeting = parse_meeting_json_fields(meeting)
                 meetings.append(meeting)
             
             return meetings
@@ -402,13 +384,7 @@ class Database:
                 meeting = dict(row)
                 
                 # Parse JSON fields
-                if meeting['participants']:
-                    meeting['participants'] = json.loads(meeting['participants'])
-                if meeting['summary']:
-                    meeting['summary'] = json.loads(meeting['summary'])
-                if meeting['action_items']:
-                    meeting['action_items'] = json.loads(meeting['action_items'])
-                
+                meeting = parse_meeting_json_fields(meeting)
                 meetings.append(meeting)
             
             return meetings

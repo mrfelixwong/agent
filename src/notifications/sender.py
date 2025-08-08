@@ -10,6 +10,13 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional, Dict, Any, List
 from datetime import datetime, date
+from pathlib import Path
+
+try:
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+    HAS_JINJA2 = True
+except ImportError:
+    HAS_JINJA2 = False
 
 from ..utils.logger import setup_logger
 from ..utils.helpers import format_duration
@@ -240,6 +247,39 @@ class EmailSender:
     
     def _create_meeting_html(self, summary: Dict[str, Any]) -> str:
         """Create HTML content for meeting summary email"""
+        if HAS_JINJA2:
+            # Use external template file
+            template_path = Path(__file__).parent / 'templates'
+            env = Environment(
+                loader=FileSystemLoader(template_path),
+                autoescape=select_autoescape(['html', 'xml'])
+            )
+            
+            try:
+                template = env.get_template('meeting_summary.html')
+                participants = summary.get('participants', [])
+                duration = summary.get('duration_minutes', 0)
+                
+                return template.render(
+                    meeting_name=summary.get('meeting_name', 'Meeting'),
+                    date=datetime.now().strftime('%B %d, %Y'),
+                    duration=format_duration(duration * 60) if duration else 'Not recorded',
+                    participants=', '.join(participants) if participants else 'Not recorded',
+                    executive_summary=summary.get('executive_summary', ''),
+                    key_points=summary.get('key_points', []),
+                    decisions_made=summary.get('decisions_made', []),
+                    action_items=summary.get('action_items', []),
+                    next_steps=summary.get('next_steps', []),
+                    timestamp=datetime.now().strftime('%Y-%m-%d at %H:%M')
+                )
+            except Exception as e:
+                logger.warning(f"Template rendering failed, using fallback: {e}")
+        
+        # Fallback to embedded HTML if Jinja2 not available
+        return self._create_meeting_html_fallback(summary)
+    
+    def _create_meeting_html_fallback(self, summary: Dict[str, Any]) -> str:
+        """Fallback HTML generation when templates are unavailable"""
         meeting_name = summary.get('meeting_name', 'Meeting')
         participants = summary.get('participants', [])
         duration = summary.get('duration_minutes', 0)
@@ -249,73 +289,66 @@ class EmailSender:
         action_items = summary.get('action_items', [])
         next_steps = summary.get('next_steps', [])
         
-        html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                .header {{ background-color: #2c3e50; color: white; padding: 20px; text-align: center; }}
-                .content {{ padding: 20px; }}
-                .section {{ margin-bottom: 25px; }}
-                .section h2 {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 5px; }}
-                .metadata {{ background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 20px; }}
-                ul {{ padding-left: 20px; }}
-                li {{ margin-bottom: 5px; }}
-                .action-item {{ background-color: #fff3cd; padding: 10px; border-left: 4px solid #ffc107; margin-bottom: 10px; }}
-                .footer {{ text-align: center; color: #7f8c8d; font-size: 12px; margin-top: 30px; }}
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>📝 Meeting Summary</h1>
-                <p>{meeting_name}</p>
-            </div>
-            
-            <div class="content">
-                <div class="metadata">
-                    <strong>Meeting Details:</strong><br>
-                    📅 Date: {datetime.now().strftime('%B %d, %Y')}<br>
-                    ⏱️ Duration: {format_duration(duration * 60) if duration else 'Not recorded'}<br>
-                    👥 Participants: {', '.join(participants) if participants else 'Not recorded'}
-                </div>
-                
-                <div class="section">
-                    <h2>🎯 Executive Summary</h2>
-                    <p>{executive_summary or 'No executive summary available.'}</p>
-                </div>
-                
-                <div class="section">
-                    <h2>🔑 Key Points</h2>
-                    {'<ul>' + ''.join(f'<li>{point}</li>' for point in key_points) + '</ul>' if key_points else '<p>No key points recorded.</p>'}
-                </div>
-                
-                <div class="section">
-                    <h2>✅ Decisions Made</h2>
-                    {'<ul>' + ''.join(f'<li>{decision}</li>' for decision in decisions_made) + '</ul>' if decisions_made else '<p>No decisions recorded.</p>'}
-                </div>
-                
-                <div class="section">
-                    <h2>📋 Action Items</h2>
-                    {self._format_action_items_html(action_items) if action_items else '<p>No action items recorded.</p>'}
-                </div>
-                
-                <div class="section">
-                    <h2>➡️ Next Steps</h2>
-                    {'<ul>' + ''.join(f'<li>{step}</li>' for step in next_steps) + '</ul>' if next_steps else '<p>No next steps recorded.</p>'}
-                </div>
-            </div>
-            
-            <div class="footer">
-                <p>Generated by Meeting Agent on {datetime.now().strftime('%Y-%m-%d at %H:%M')}</p>
-            </div>
-        </body>
-        </html>
+        return f"""
+        <html><body>
+        <h1>📝 Meeting Summary: {meeting_name}</h1>
+        <p><strong>Date:</strong> {datetime.now().strftime('%B %d, %Y')}<br>
+        <strong>Duration:</strong> {format_duration(duration * 60) if duration else 'Not recorded'}<br>
+        <strong>Participants:</strong> {', '.join(participants) if participants else 'Not recorded'}</p>
+        
+        <h2>🎯 Executive Summary</h2>
+        <p>{executive_summary or 'No executive summary available.'}</p>
+        
+        <h2>🔑 Key Points</h2>
+        {'<ul>' + ''.join(f'<li>{point}</li>' for point in key_points) + '</ul>' if key_points else '<p>No key points recorded.</p>'}
+        
+        <h2>✅ Decisions Made</h2>
+        {'<ul>' + ''.join(f'<li>{decision}</li>' for decision in decisions_made) + '</ul>' if decisions_made else '<p>No decisions recorded.</p>'}
+        
+        <h2>📋 Action Items</h2>
+        {self._format_action_items_html(action_items) if action_items else '<p>No action items recorded.</p>'}
+        
+        <h2>➡️ Next Steps</h2>
+        {'<ul>' + ''.join(f'<li>{step}</li>' for step in next_steps) + '</ul>' if next_steps else '<p>No next steps recorded.</p>'}
+        
+        <p><em>Generated by Meeting Agent on {datetime.now().strftime('%Y-%m-%d at %H:%M')}</em></p>
+        </body></html>
         """
-        return html
     
     def _create_meeting_text(self, summary: Dict[str, Any]) -> str:
         """Create text content for meeting summary email"""
+        if HAS_JINJA2:
+            # Use external template file
+            template_path = Path(__file__).parent / 'templates'
+            env = Environment(loader=FileSystemLoader(template_path))
+            
+            try:
+                template = env.get_template('meeting_summary.txt')
+                participants = summary.get('participants', [])
+                duration = summary.get('duration_minutes', 0)
+                
+                return template.render(
+                    meeting_name=summary.get('meeting_name', 'Meeting'),
+                    date=datetime.now().strftime('%B %d, %Y'),
+                    duration=format_duration(duration * 60) if duration else 'Not recorded',
+                    participants=', '.join(participants) if participants else 'Not recorded',
+                    executive_summary=summary.get('executive_summary', ''),
+                    key_points=summary.get('key_points', []),
+                    decisions_made=summary.get('decisions_made', []),
+                    action_items=summary.get('action_items', []),
+                    next_steps=summary.get('next_steps', []),
+                    timestamp=datetime.now().strftime('%Y-%m-%d at %H:%M'),
+                    format_list_text=self._format_list_text,
+                    format_action_items_text=self._format_action_items_text
+                ).strip()
+            except Exception as e:
+                logger.warning(f"Text template rendering failed, using fallback: {e}")
+        
+        # Fallback to embedded text if Jinja2 not available
+        return self._create_meeting_text_fallback(summary)
+    
+    def _create_meeting_text_fallback(self, summary: Dict[str, Any]) -> str:
+        """Fallback text generation when templates are unavailable"""
         meeting_name = summary.get('meeting_name', 'Meeting')
         participants = summary.get('participants', [])
         duration = summary.get('duration_minutes', 0)
