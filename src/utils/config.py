@@ -34,70 +34,71 @@ class Config:
     def __contains__(self, key: str) -> bool:
         return key in self._config
 
-def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
-    """Load configuration from YAML file and environment variables"""
+def load_config(config_path: Optional[str] = None, validate_secrets: bool = True) -> Dict[str, Any]:
+    """
+    Load configuration using hybrid approach:
+    - Non-sensitive settings from YAML file
+    - Secrets from environment variables
+    
+    Args:
+        config_path: Path to YAML config file
+        validate_secrets: Whether to validate required secrets (False for mock components)
+    """
     
     if config_path is None:
         config_path = Path(__file__).parent.parent.parent / "config" / "settings.yml"
     
-    # Default configuration
-    config = {
-        'openai': {
-            'api_key': os.getenv('OPENAI_API_KEY'),
-        },
-        'email': {
-            'address': os.getenv('EMAIL_ADDRESS'),
-            'password': os.getenv('EMAIL_PASSWORD'),
-            'smtp_server': os.getenv('SMTP_SERVER', 'smtp.gmail.com'),
-            'smtp_port': int(os.getenv('SMTP_PORT', '587')),
-            'daily_summary_time': os.getenv('DAILY_SUMMARY_TIME', '22:00')
-        },
-        'web': {
-            'host': os.getenv('WEB_HOST', 'localhost'),
-            'port': int(os.getenv('WEB_PORT', '5002')),
-            'secret_key': os.getenv('SECRET_KEY', 'default-secret'),
-            'debug': os.getenv('FLASK_DEBUG', 'True').lower() == 'true'
-        },
-        'database': {
-            'url': os.getenv('DATABASE_URL', 'sqlite:///data/database.db')
-        },
-        'audio': {
-            'sample_rate': int(os.getenv('AUDIO_SAMPLE_RATE', '44100')),
-            'channels': int(os.getenv('AUDIO_CHANNELS', '2')),
-            'format': os.getenv('AUDIO_FORMAT', '16bit')
-        },
-        'logging': {
-            'level': os.getenv('LOG_LEVEL', 'INFO'),
-            'file': os.getenv('LOG_FILE', 'logs/meeting_agent.log')
-        }
-    }
+    # Start with default configuration
+    config = {}
     
-    # Load from YAML file if it exists
+    # Load settings from YAML file first
     if os.path.exists(config_path):
         try:
             with open(config_path, 'r') as f:
-                yaml_config = yaml.safe_load(f)
-                if yaml_config:
-                    config.update(yaml_config)
+                config = yaml.safe_load(f) or {}
         except Exception as e:
             print(f"Warning: Could not load config file {config_path}: {e}")
     
-    # Validate required configuration
-    _validate_config(config)
+    # Add secrets from environment variables
+    # These override any values from the YAML file for security
+    
+    # OpenAI secrets
+    if 'openai' not in config:
+        config['openai'] = {}
+    config['openai']['api_key'] = os.getenv('OPENAI_API_KEY')
+    
+    # Email secrets
+    if 'email' not in config:
+        config['email'] = {}
+    config['email']['address'] = os.getenv('EMAIL_ADDRESS')
+    config['email']['password'] = os.getenv('EMAIL_PASSWORD')
+    
+    # Web secrets
+    if 'web' not in config:
+        config['web'] = {}
+    # Only override secret_key from environment, keep other web settings from YAML
+    if os.getenv('SECRET_KEY'):
+        config['web']['secret_key'] = os.getenv('SECRET_KEY')
+    elif 'secret_key' not in config.get('web', {}):
+        config['web']['secret_key'] = 'default-secret-key'
+    
+    # Validate required configuration (skip for mock components)
+    if validate_secrets:
+        _validate_config(config)
     
     return config
 
 def _validate_config(config: Dict[str, Any]) -> None:
     """Validate that required configuration values are present"""
-    required_keys = [
-        'openai.api_key',
-        'email.address',
-        'email.password'
+    required_secrets = [
+        ('openai.api_key', 'OPENAI_API_KEY'),
+        ('email.address', 'EMAIL_ADDRESS'), 
+        ('email.password', 'EMAIL_PASSWORD')
     ]
     
-    missing_keys = []
-    for key in required_keys:
-        keys = key.split('.')
+    missing_secrets = []
+    for config_key, env_var in required_secrets:
+        keys = config_key.split('.')
         value = config
         for k in keys:
             if isinstance(value, dict) and k in value:
@@ -106,10 +107,10 @@ def _validate_config(config: Dict[str, Any]) -> None:
                 value = None
                 break
         if not value:
-            missing_keys.append(key)
+            missing_secrets.append(f"{config_key} (set {env_var} environment variable)")
     
-    if missing_keys:
-        raise ValueError(f"Missing required configuration keys: {', '.join(missing_keys)}")
+    if missing_secrets:
+        raise ValueError(f"Missing required secrets: {', '.join(missing_secrets)}")
 
 def save_config(config: Dict[str, Any], config_path: Optional[str] = None) -> None:
     """Save configuration to YAML file"""

@@ -31,22 +31,24 @@ class Transcriber:
     for meeting recordings.
     """
     
-    # Whisper API pricing per minute (as of 2024)
-    WHISPER_COST_PER_MINUTE = 0.006  # $0.006 per minute
+    # Default Whisper API pricing per minute (can be overridden by config)
+    DEFAULT_WHISPER_COST_PER_MINUTE = 0.006  # $0.006 per minute
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "whisper-1"):
+    def __init__(self, api_key: Optional[str] = None, model: str = "whisper-1", cost_per_minute: Optional[float] = None):
         """
         Initialize transcriber
         
         Args:
             api_key: OpenAI API key (optional, can use environment variable)
             model: Whisper model to use
+            cost_per_minute: Cost per minute for transcription (optional, uses default if not provided)
         """
         self.model = model
         self.is_transcribing = False
         self.current_transcript = ""
         
         # Cost tracking
+        self.cost_per_minute = cost_per_minute or self.DEFAULT_WHISPER_COST_PER_MINUTE
         self.total_audio_duration = 0.0  # in seconds
         self.total_cost = 0.0
         
@@ -175,7 +177,7 @@ class Transcriber:
             'total_duration_seconds': self.total_audio_duration,
             'total_duration_minutes': self.total_audio_duration / 60.0,
             'total_cost': self.total_cost,
-            'cost_per_minute': self.WHISPER_COST_PER_MINUTE
+            'cost_per_minute': self.cost_per_minute
         }
     
     def add_audio_chunk(self, audio_data: bytes) -> bool:
@@ -272,7 +274,7 @@ class Transcriber:
                 
                 # Update cost tracking
                 self.total_audio_duration += audio_duration
-                chunk_cost = (audio_duration / 60.0) * self.WHISPER_COST_PER_MINUTE
+                chunk_cost = (audio_duration / 60.0) * self.cost_per_minute
                 self.total_cost += chunk_cost
                 
                 logger.info(f"Transcribed {audio_duration:.1f}s of audio (cost: ${chunk_cost:.4f})")

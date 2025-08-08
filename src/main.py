@@ -28,7 +28,7 @@ class MeetingAgent:
     def __init__(self, config_path: Optional[str] = None, use_mock_components: bool = False):
         """Initialize Meeting Agent with configuration"""
         # Load configuration
-        self.config = load_config(config_path)
+        self.config = load_config(config_path, validate_secrets=not use_mock_components)
         
         # State management
         self.is_running = False
@@ -85,7 +85,8 @@ class MeetingAgent:
         # Real-time transcription
         self.transcriber = Transcriber(
             api_key=self.config.get('openai.api_key'),
-            model=self.config.get('openai.transcription_model', 'whisper-1')
+            model=self.config.get('openai.transcription_model', 'whisper-1'),
+            cost_per_minute=self.config.get('cost.whisper_per_minute', 0.006)
         )
         
         # AI summarization
