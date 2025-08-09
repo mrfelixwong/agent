@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Test production components initialization
+Test Meeting Agent System - Web-Only Version
+Tests all components and web interface functionality
 """
 
 import sys
@@ -93,7 +94,7 @@ def test_production_components():
         print("• AI summarization")
         
         print(f"\nTo start using:")
-        print(f"python production_cli.py")
+        print(f"python app.py")
         
         return True
     else:
@@ -110,7 +111,7 @@ def test_meeting_agent():
         from src.main import MeetingAgent
         
         print("Initializing MeetingAgent with real components...")
-        agent = MeetingAgent(use_mock_components=False)
+        agent = MeetingAgent()
         
         print("✅ MeetingAgent initialized successfully!")
         
@@ -146,10 +147,10 @@ def main():
         print(f"\n" + "=" * 50)
         print("🚀 PRODUCTION SYSTEM READY!")
         print(f"\nNext steps:")
-        print(f"1. Run: python production_cli.py")
-        print(f"2. Select option 1 to start recording") 
-        print(f"3. Speak into your microphone")
-        print(f"4. Select option 2 to stop and get AI summary")
+        print(f"1. Run: python app.py")
+        print(f"2. Open browser to http://127.0.0.1:5003")
+        print(f"3. Click 'Start Recording' and speak into your microphone") 
+        print(f"4. Click 'Stop Recording' to generate AI summary")
         return 0
     else:
         print(f"\n" + "=" * 50)

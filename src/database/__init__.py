@@ -2,6 +2,6 @@
 Database package for Meeting Agent
 """
 
-from .database import Database, MockDatabase
+from .database import Database
 
-__all__ = ["Database", "MockDatabase"]
+__all__ = ["Database"]

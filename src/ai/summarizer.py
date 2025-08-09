@@ -66,7 +66,6 @@ class Summarizer:
         self, 
         transcript: str, 
         meeting_name: Optional[str] = None,
-        participants: Optional[List[str]] = None,
         duration_minutes: Optional[int] = None
     ) -> Dict[str, Any]:
         """
@@ -75,7 +74,6 @@ class Summarizer:
         Args:
             transcript: Full meeting transcript text
             meeting_name: Name/title of the meeting (optional)
-            participants: List of participant names (optional)
             duration_minutes: Meeting duration in minutes (optional)
             
         Returns:
@@ -89,8 +87,6 @@ class Summarizer:
             context_info = []
             if meeting_name:
                 context_info.append(f"Meeting: {meeting_name}")
-            if participants:
-                context_info.append(f"Participants: {', '.join(participants)}")
             if duration_minutes:
                 context_info.append(f"Duration: {duration_minutes} minutes")
             
@@ -124,7 +120,6 @@ class Summarizer:
             # Add metadata
             summary.update({
                 'meeting_name': meeting_name,
-                'participants': participants or [],
                 'duration_minutes': duration_minutes,
                 'transcript_length': len(transcript),
                 'summary_generated_at': datetime.now().isoformat(),
@@ -434,144 +429,3 @@ class Summarizer:
             return []
 
 
-class MockSummarizer(Summarizer):
-    """
-    Mock summarizer for testing without actual API calls
-    """
-    
-    def __init__(self, **kwargs):
-        """Initialize mock summarizer"""
-        # Don't call parent __init__ to avoid OpenAI API setup
-        self.model = kwargs.get('model', 'mock-gpt-4')
-        self.max_tokens = kwargs.get('max_tokens', 1500)
-        
-        # Mock settings
-        self._mock_summary = {
-            'executive_summary': 'This is a mock executive summary of the meeting.',
-            'key_points': [
-                'Discussed project timeline and milestones',
-                'Reviewed budget allocation for Q4',
-                'Addressed team resource requirements'
-            ],
-            'decisions_made': [
-                'Approved budget increase of 15% for development team',
-                'Set project delivery date for December 15th'
-            ],
-            'action_items': [
-                'John to prepare detailed project timeline by Friday',
-                'Sarah to review vendor contracts by next week'
-            ],
-            'next_steps': [
-                'Schedule follow-up meeting for next Thursday',
-                'Send meeting notes to all stakeholders'
-            ]
-        }
-        self._mock_action_items = [
-            {
-                'task': 'Review project proposal',
-                'assignee': 'John Smith',
-                'deadline': 'End of week',
-                'priority': 'high'
-            },
-            {
-                'task': 'Update budget spreadsheet',
-                'assignee': 'Sarah Johnson',
-                'deadline': 'Next Tuesday',
-                'priority': 'medium'
-            }
-        ]
-        self._simulate_error = False
-        self._processing_delay = 0.1
-    
-    def set_mock_summary(self, summary: Dict[str, Any]):
-        """Set mock summary for testing"""
-        self._mock_summary.update(summary)
-    
-    def set_mock_action_items(self, action_items: List[Dict[str, Any]]):
-        """Set mock action items for testing"""
-        self._mock_action_items = action_items
-    
-    def set_simulate_error(self, should_error: bool):
-        """Set whether to simulate API errors"""
-        self._simulate_error = should_error
-    
-    def set_processing_delay(self, delay: float):
-        """Set mock processing delay"""
-        self._processing_delay = max(0, delay)
-    
-    def summarize_meeting(
-        self, 
-        transcript: str, 
-        meeting_name: Optional[str] = None,
-        participants: Optional[List[str]] = None,
-        duration_minutes: Optional[int] = None
-    ) -> Dict[str, Any]:
-        """Mock meeting summarization"""
-        if not transcript or not transcript.strip():
-            raise ValueError("Transcript cannot be empty")
-        
-        if self._simulate_error:
-            raise Exception("Simulated summarization error")
-        
-        # Simulate processing delay
-        time.sleep(self._processing_delay)
-        
-        # Create mock summary with provided metadata
-        summary = self._mock_summary.copy()
-        summary.update({
-            'meeting_name': meeting_name,
-            'participants': participants or [],
-            'duration_minutes': duration_minutes,
-            'transcript_length': len(transcript),
-            'summary_generated_at': datetime.now().isoformat(),
-            'model_used': self.model
-        })
-        
-        return summary
-    
-    def extract_action_items(self, transcript: str) -> List[Dict[str, Any]]:
-        """Mock action item extraction"""
-        if not transcript or not transcript.strip():
-            return []
-        
-        if self._simulate_error:
-            raise Exception("Simulated action item extraction error")
-        
-        time.sleep(self._processing_delay)
-        return self._mock_action_items.copy()
-    
-    def generate_daily_summary(self, meeting_summaries: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Mock daily summary generation"""
-        if self._simulate_error:
-            raise Exception("Simulated daily summary error")
-        
-        time.sleep(self._processing_delay)
-        
-        if not meeting_summaries:
-            return {
-                'daily_summary': 'No meetings recorded today.',
-                'total_meetings': 0,
-                'total_duration': 0,
-                'key_themes': [],
-                'all_action_items': [],
-                'summary_generated_at': datetime.now().isoformat()
-            }
-        
-        total_meetings = len(meeting_summaries)
-        total_duration = sum(
-            summary.get('duration_minutes', 0) 
-            for summary in meeting_summaries
-        )
-        
-        return {
-            'daily_summary': f'Today you had {total_meetings} productive meetings covering key project initiatives and strategic planning. The team made several important decisions and established clear action items for moving forward.',
-            'total_meetings': total_meetings,
-            'total_duration': total_duration,
-            'key_themes': ['Project Planning', 'Budget Review', 'Team Coordination'],
-            'all_action_items': self._mock_action_items * total_meetings,  # Mock aggregation
-            'meeting_titles': [
-                summary.get('meeting_name', f'Meeting {i}') 
-                for i, summary in enumerate(meeting_summaries, 1)
-            ],
-            'summary_generated_at': datetime.now().isoformat()
-        }

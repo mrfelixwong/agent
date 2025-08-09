@@ -2,6 +2,6 @@
 AI package for Meeting Agent
 """
 
-from .summarizer import Summarizer, MockSummarizer
+from .summarizer import Summarizer
 
-__all__ = ["Summarizer", "MockSummarizer"]
+__all__ = ["Summarizer"]

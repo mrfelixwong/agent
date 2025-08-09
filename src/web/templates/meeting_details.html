@@ -5,11 +5,39 @@
 {% block header %}{{ meeting.name }}{% endblock %}
 
 {% block content %}
+
+<!-- Debug Information (temporary) -->
+<div style="background: #f0f0f0; padding: 10px; margin-bottom: 20px; border-radius: 5px; font-size: 0.8em;">
+    <strong>🐛 Debug Info:</strong><br>
+    Status: {{ meeting.status }}<br>
+    Transcript Length: {{ (meeting.transcript|length) if meeting.transcript else 0 }}<br>
+    Duration Seconds: {{ meeting.duration_seconds or 'Not set' }}<br>
+    Duration Minutes: {{ meeting.duration_minutes or 'Not set' }}<br>
+    Has Summary: {{ 'Yes' if meeting.summary else 'No' }}<br>
+    Raw Transcript Preview: "{{ (meeting.transcript[:100] + '...') if meeting.transcript else 'No transcript' }}"
+</div>
+
 <div class="meta-info">
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
         <div><strong>Date:</strong> {{ meeting.date }}</div>
-        <div><strong>Duration:</strong> {{ meeting.duration_minutes or 0 }} minutes</div>
-        <div><strong>Participants:</strong> {{ meeting.participants|join(', ') if meeting.participants else 'None listed' }}</div>
+        {% if meeting.start_time %}
+        <div><strong>Start Time:</strong> 
+            {% if meeting.start_time_minutes is defined %}
+                {{ "%02d:%02d"|format(meeting.start_time_minutes // 60, meeting.start_time_minutes % 60) }}
+            {% else %}
+                {{ meeting.start_time.strftime('%H:%M') if meeting.start_time else 'Unknown' }}
+            {% endif %}
+        </div>
+        {% endif %}
+        <div><strong>Duration:</strong> 
+            {% if meeting.duration_seconds and meeting.duration_seconds > 0 %}
+                {% set minutes = (meeting.duration_seconds / 60)|int %}
+                {% set seconds = (meeting.duration_seconds % 60)|int %}
+                {{ minutes }}m {{ seconds }}s
+            {% else %}
+                {{ meeting.duration_minutes or 0 }} minutes
+            {% endif %}
+        </div>
         {% if meeting.transcription_cost %}
         <div><strong>Transcription Cost:</strong> ${{ "%.4f"|format(meeting.transcription_cost) }}</div>
         {% endif %}
@@ -128,19 +156,56 @@
 
 <!-- Full Transcript -->
 {% if meeting.transcript %}
+<!-- Transcript exists and will be displayed -->
 <div class="section">
     <h3>
         <span>📄 Full Transcript</span>
-        <button class="button copy" onclick="copyToClipboard(document.getElementById('full-transcript').textContent, this)">
-            📋 Copy Transcript
-        </button>
+        <div style="display: inline-block; margin-left: 10px;">
+            <button class="button copy" onclick="copyToClipboard(document.getElementById('full-transcript').textContent, this)">
+                📋 Copy Transcript
+            </button>
+            <button class="button" onclick="toggleTranscript()" id="toggle-transcript-btn">
+                🔽 Collapse
+            </button>
+        </div>
     </h3>
-    <details>
-        <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px;">
-            Click to expand transcript ({{ meeting.transcript|length }} characters)
-        </summary>
-        <div class="copy-format" id="full-transcript" style="margin-top: 10px;">{{ meeting.transcript }}</div>
-    </details>
+    <div style="font-size: 0.9em; color: #666; margin-bottom: 10px;">
+        {{ meeting.transcript|length }} characters • Generated during {{ meeting.duration_minutes or 0 }} minute meeting
+    </div>
+    <div id="transcript-container" class="transcript-display" style="
+        background: #f8f9fa; 
+        border: 1px solid #dee2e6; 
+        border-radius: 6px; 
+        padding: 20px; 
+        line-height: 1.6; 
+        font-family: 'Georgia', serif;
+        max-height: none;
+        overflow-y: visible;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    ">
+        <div id="full-transcript">{{ meeting.transcript }}</div>
+    </div>
+    <div style="margin-top: 10px; font-size: 0.85em; color: #666;">
+        💡 <strong>Tip:</strong> Use the copy button to quickly share this transcript with ChatGPT or other AI tools for analysis.
+    </div>
+</div>
+{% else %}
+<!-- No Transcript Available -->
+<div class="section">
+    <h3>📄 No Transcript Available</h3>
+    <div class="alert alert-info">
+        <p>This meeting doesn't have a transcript yet. This could happen if:</p>
+        <ul>
+            <li>The meeting is still in 'recorded' status and needs to be stopped to generate a transcript</li>
+            <li>The meeting was recorded but the transcription failed</li>
+            <li>The meeting was created but never had audio recorded</li>
+        </ul>
+        <p><strong>Status:</strong> {{ meeting.status }}</p>
+        {% if meeting.status == 'recorded' %}
+        <p><em>💡 If this meeting is not currently recording, it may be stuck. Try starting a new meeting.</em></p>
+        {% endif %}
+    </div>
 </div>
 {% endif %}
 
@@ -203,7 +268,6 @@
         let markdown = `# ${meetingData.name}\n\n`;
         markdown += `**Date:** ${meetingData.date}\n`;
         markdown += `**Duration:** ${meetingData.duration_minutes || 0} minutes\n`;
-        markdown += `**Participants:** ${(meetingData.participants || []).join(', ') || 'None listed'}\n\n`;
         
         {% if meeting.summary %}
         {% if meeting.summary.executive_summary %}
@@ -252,6 +316,25 @@
         a.click();
         URL.revokeObjectURL(url);
     }
+    
+    function toggleTranscript() {
+        const container = document.getElementById('transcript-container');
+        const button = document.getElementById('toggle-transcript-btn');
+        
+        if (container.style.maxHeight === 'none' || container.style.maxHeight === '') {
+            // Collapse it
+            container.style.maxHeight = '200px';
+            container.style.overflowY = 'auto';
+            button.innerHTML = '🔼 Expand';
+            button.title = 'Click to expand transcript';
+        } else {
+            // Expand it
+            container.style.maxHeight = 'none';
+            container.style.overflowY = 'visible';
+            button.innerHTML = '🔽 Collapse';
+            button.title = 'Click to collapse transcript';
+        }
+    }
 </script>
 {% endblock %}
 
@@ -262,7 +345,7 @@
         const chatgptFormat = `MEETING SUMMARY - ${meetingData.name} (${meetingData.date})
 
 CONTEXT:
-Meeting with ${(meetingData.participants || []).length} participant${(meetingData.participants || []).length !== 1 ? 's' : ''}, ${meetingData.duration_minutes || 0} minutes duration
+Meeting duration: ${meetingData.duration_minutes || 0} minutes
 
 {% if meeting.summary and meeting.summary.decisions_made %}
 KEY DECISIONS:

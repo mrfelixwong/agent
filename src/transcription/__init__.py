@@ -2,6 +2,6 @@
 Transcription package for Meeting Agent
 """
 
-from .transcriber import Transcriber, MockTranscriber
+from .simple_transcriber import SimpleTranscriber
 
-__all__ = ["Transcriber", "MockTranscriber"]
+__all__ = ["SimpleTranscriber"]

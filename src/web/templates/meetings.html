@@ -5,66 +5,171 @@
 {% block header %}Meeting History{% endblock %}
 
 {% block content %}
-<div class="meta-info">
-    <strong>Total Meetings:</strong> {{ meetings|length }}
-    {% if meetings %}
-    | <strong>Total Cost:</strong> ${{ "%.4f"|format(meetings|selectattr('transcription_cost')|map(attribute='transcription_cost')|sum) }}
-    {% endif %}
+
+<style>
+.search-container {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 25px;
+    border-radius: 15px;
+    margin-bottom: 30px;
+    color: white;
+}
+
+.search-input {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 25px;
+    font-size: 16px;
+    margin: 10px 0;
+}
+
+.search-input:focus {
+    outline: none;
+    box-shadow: 0 0 10px rgba(255,255,255,0.3);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.stat-item {
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+}
+
+.stat-value {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #667eea;
+}
+
+.meeting-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 15px 0;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.meeting-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.meeting-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: center;
+    margin: 10px 0;
+    font-size: 0.9em;
+    color: #666;
+}
+
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    color: white;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+</style>
+
+<!-- Search and Stats Section -->
+<div class="search-container">
+    <h3 style="margin: 0 0 15px 0;">🔍 Search Meetings</h3>
+    <input type="text" id="search-input" class="search-input" 
+           placeholder="Search by name or content..." 
+           onkeyup="searchMeetings(event)">
+    
+    <div class="stats-grid">
+        <div class="stat-item">
+            <div class="stat-value">{{ meetings|length }}</div>
+            <div>Total Meetings</div>
+        </div>
+        {% if meetings %}
+        <div class="stat-item">
+            <div class="stat-value">${{ "%.2f"|format(meetings|selectattr('transcription_cost')|map(attribute='transcription_cost')|sum) }}</div>
+            <div>Total Cost</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">{{ (meetings|selectattr('duration_seconds')|map(attribute='duration_seconds')|sum / 60)|int }}</div>
+            <div>Total Minutes</div>
+        </div>
+        {% endif %}
+    </div>
 </div>
+
+<div id="search-results" style="display: none;">
+    <h3>🔍 Search Results</h3>
+    <div id="search-results-container"></div>
+    <button onclick="clearSearch()" class="button secondary" style="margin: 20px 0;">Clear Search</button>
+</div>
+
+<div id="all-meetings">
 
 {% if meetings %}
     {% for meeting in meetings %}
-    <div class="section">
-        <h3>
-            <span>
-                🎙️ {{ meeting.name }}
-                <small style="font-weight: normal; color: #6c757d;">
-                    {{ meeting.date }} • {{ meeting.duration_minutes or 0 }} min
-                    {% if meeting.transcription_cost %}
-                        • ${{ "%.4f"|format(meeting.transcription_cost) }}
+    <div class="meeting-card">
+        <div style="display: flex; justify-content: between; align-items: flex-start;">
+            <div style="flex: 1;">
+                <h3 style="margin: 0 0 10px 0; color: #333;">
+                    🎙️ {{ meeting.name }}
+                </h3>
+                
+                <div class="meeting-meta">
+                    <span>📅 {{ meeting.date }}</span>
+                    {% if meeting.start_time_minutes is defined %}
+                        <span>🕒 {{ "%02d:%02d"|format(meeting.start_time_minutes // 60, meeting.start_time_minutes % 60) }}</span>
                     {% endif %}
-                </small>
-            </span>
-            <a href="/meetings/{{ meeting.id }}" class="button">View Details</a>
-        </h3>
-        
-        <div style="margin-top: 10px;">
-            <strong>Participants:</strong> 
-            {% if meeting.participants %}
-                {{ meeting.participants|join(', ') }}
-            {% else %}
-                No participants listed
-            {% endif %}
-        </div>
-        
-        {% if meeting.summary %}
-        <div style="margin-top: 10px;">
-            <strong>Summary:</strong>
-            {% if meeting.summary.executive_summary %}
-                {{ meeting.summary.executive_summary[:200] }}{% if meeting.summary.executive_summary|length > 200 %}...{% endif %}
-            {% else %}
-                Summary available
-            {% endif %}
-        </div>
-        {% endif %}
-        
-        <div style="margin-top: 10px;">
-            <span style="background: 
-                {% if meeting.status == 'completed' or meeting.status == 'summarized' %}#28a745
-                {% elif meeting.status == 'recording' %}#dc3545
-                {% elif meeting.status == 'transcribed' %}#ffc107
-                {% else %}#6c757d{% endif %}; 
-                color: white; 
-                padding: 3px 8px; 
-                border-radius: 3px; 
-                font-size: 0.8em;">
-                {{ meeting.status|upper }}
-            </span>
-            {% if meeting.action_items and meeting.action_items|length > 0 %}
-                <span style="margin-left: 10px; color: #dc3545;">
-                    ✅ {{ meeting.action_items|length }} Action Item{{ 's' if meeting.action_items|length != 1 else '' }}
-                </span>
-            {% endif %}
+                    <span>⏱️ {% if meeting.duration_seconds and meeting.duration_seconds > 0 %}
+                        {% set minutes = (meeting.duration_seconds / 60)|int %}
+                        {% set seconds = (meeting.duration_seconds % 60)|int %}
+                        {{ minutes }}m {{ seconds }}s
+                    {% else %}
+                        {{ meeting.duration_minutes or 0 }} min
+                    {% endif %}</span>
+                    {% if meeting.transcription_cost %}
+                        <span>💰 ${{ "%.4f"|format(meeting.transcription_cost) }}</span>
+                    {% endif %}
+                </div>
+                
+                
+                {% if meeting.summary and meeting.summary.executive_summary %}
+                <div style="margin: 10px 0; color: #666; line-height: 1.5;">
+                    <strong>📋 Summary:</strong> 
+                    {{ meeting.summary.executive_summary[:150] }}{% if meeting.summary.executive_summary|length > 150 %}...{% endif %}
+                </div>
+                {% endif %}
+                
+                <div style="display: flex; justify-content: between; align-items: center; margin-top: 15px;">
+                    <div>
+                        <span class="status-badge" style="background: 
+                            {% if meeting.status == 'completed' or meeting.status == 'summarized' %}#28a745
+                            {% elif meeting.status == 'recording' %}#dc3545
+                            {% elif meeting.status == 'transcribed' %}#ffc107
+                            {% else %}#6c757d{% endif %};">
+                            {{ meeting.status|upper }}
+                        </span>
+                        {% if meeting.action_items and meeting.action_items|length > 0 %}
+                            <span style="margin-left: 10px; color: #dc3545; font-weight: bold;">
+                                ✅ {{ meeting.action_items|length }} Action{{ 's' if meeting.action_items|length != 1 else '' }}
+                            </span>
+                        {% endif %}
+                    </div>
+                    <a href="/meetings/{{ meeting.id }}" style="background: #667eea; color: white; padding: 8px 16px; border-radius: 20px; text-decoration: none; font-weight: bold;">
+                        View Details →
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
     {% endfor %}
@@ -75,7 +180,156 @@
     </div>
 {% endif %}
 
+</div> <!-- Close all-meetings div -->
+
 <div style="margin-top: 30px; text-align: center;">
-    <a href="/" class="button secondary">← Back to Dashboard</a>
+    <a href="/" style="background: #667eea; color: white; padding: 12px 24px; border-radius: 25px; text-decoration: none; font-weight: bold;">
+        ← Back to Dashboard
+    </a>
 </div>
+
+<script>
+let searchTimeout;
+
+function searchMeetings(event) {
+    const query = event.target.value.trim();
+    
+    // Clear previous timeout
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+    }
+    
+    // If query is empty, show all meetings
+    if (query.length === 0) {
+        clearSearch();
+        return;
+    }
+    
+    // Debounce the search
+    searchTimeout = setTimeout(() => {
+        performSearch(query);
+    }, 300);
+}
+
+function performSearch(query) {
+    fetch(`/api/search?q=${encodeURIComponent(query)}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displaySearchResults(data.meetings, query);
+        } else {
+            console.error('Search failed:', data.error);
+            displaySearchResults([], query);
+        }
+    })
+    .catch(error => {
+        console.error('Search error:', error);
+        displaySearchResults([], query);
+    });
+}
+
+function displaySearchResults(meetings, query) {
+    const searchResults = document.getElementById('search-results');
+    const searchContainer = document.getElementById('search-results-container');
+    const allMeetings = document.getElementById('all-meetings');
+    
+    // Hide all meetings, show search results
+    allMeetings.style.display = 'none';
+    searchResults.style.display = 'block';
+    
+    if (meetings.length === 0) {
+        searchContainer.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #666;">
+                <h4>No meetings found</h4>
+                <p>No meetings match your search for "<strong>${query}</strong>"</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    meetings.forEach(meeting => {
+        const startTime = meeting.start_time_minutes ? 
+            `🕒 ${String(Math.floor(meeting.start_time_minutes / 60)).padStart(2, '0')}:${String(meeting.start_time_minutes % 60).padStart(2, '0')}` : '';
+        
+        const duration = meeting.duration_seconds > 0 ? 
+            `${Math.floor(meeting.duration_seconds / 60)}m ${Math.floor(meeting.duration_seconds % 60)}s` : 
+            `${meeting.duration_minutes || 0} min`;
+            
+        const statusColor = {
+            'completed': '#28a745',
+            'summarized': '#28a745', 
+            'recording': '#dc3545',
+            'transcribed': '#ffc107'
+        }[meeting.status] || '#6c757d';
+        
+        html += `
+            <div class="meeting-card">
+                <div style="display: flex; justify-content: between; align-items: flex-start;">
+                    <div style="flex: 1;">
+                        <h3 style="margin: 0 0 10px 0; color: #333;">
+                            🎙️ ${meeting.name}
+                        </h3>
+                        
+                        <div class="meeting-meta">
+                            <span>📅 ${meeting.date}</span>
+                            ${startTime ? `<span>${startTime}</span>` : ''}
+                            <span>⏱️ ${duration}</span>
+                            ${meeting.transcription_cost ? `<span>💰 $${meeting.transcription_cost.toFixed(4)}</span>` : ''}
+                        </div>
+                        
+                        
+                        ${meeting.summary && meeting.summary.executive_summary ? `
+                        <div style="margin: 10px 0; color: #666; line-height: 1.5;">
+                            <strong>📋 Summary:</strong> 
+                            ${meeting.summary.executive_summary.substring(0, 150)}${meeting.summary.executive_summary.length > 150 ? '...' : ''}
+                        </div>
+                        ` : ''}
+                        
+                        <div style="display: flex; justify-content: between; align-items: center; margin-top: 15px;">
+                            <div>
+                                <span class="status-badge" style="background: ${statusColor};">
+                                    ${meeting.status.toUpperCase()}
+                                </span>
+                                ${meeting.action_items && meeting.action_items.length > 0 ? `
+                                <span style="margin-left: 10px; color: #dc3545; font-weight: bold;">
+                                    ✅ ${meeting.action_items.length} Action${meeting.action_items.length !== 1 ? 's' : ''}
+                                </span>
+                                ` : ''}
+                            </div>
+                            <a href="/meetings/${meeting.id}" style="background: #667eea; color: white; padding: 8px 16px; border-radius: 20px; text-decoration: none; font-weight: bold;">
+                                View Details →
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    searchContainer.innerHTML = html;
+}
+
+function clearSearch() {
+    const searchInput = document.getElementById('search-input');
+    const searchResults = document.getElementById('search-results');
+    const allMeetings = document.getElementById('all-meetings');
+    
+    searchInput.value = '';
+    searchResults.style.display = 'none';
+    allMeetings.style.display = 'block';
+}
+
+// Handle Enter key in search
+document.getElementById('search-input').addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        const query = this.value.trim();
+        if (query.length > 0) {
+            performSearch(query);
+        }
+    }
+});
+</script>
+
 {% endblock %}

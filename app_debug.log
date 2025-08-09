@@ -1,0 +1,45 @@
+🎙️ Meeting Agent - Web Interface
+========================================
+Initializing Meeting Agent...
+Loading configuration from /Users/felix/src/agent/config/settings.yml
+Loaded 9 configuration sections
+2025-08-08 20:18:23,325 - src.main - INFO - === Meeting Agent Starting ===
+2025-08-08 20:18:23,325 - src.main - INFO - Initializing Meeting Agent components...
+2025-08-08 20:18:23,326 - src.main - INFO - Using real components...
+2025-08-08 20:18:23,326 - src.database.database - INFO - Database initialized at: data/meetings.db
+2025-08-08 20:18:23,389 - src.audio.recorder - INFO - Audio recorder initialized successfully
+2025-08-08 20:18:23,409 - src.transcription.transcriber - INFO - Transcriber initialized with model: whisper-1
+2025-08-08 20:18:23,414 - src.ai.summarizer - INFO - Summarizer initialized with model: gpt-4
+2025-08-08 20:18:23,414 - src.main - WARNING - Email credentials not configured - email features will be disabled
+2025-08-08 20:18:23,414 - src.main - INFO - All components initialized successfully
+2025-08-08 20:18:23,414 - src.main - INFO - Meeting Agent initialized successfully
+Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+✅ Meeting Agent initialized successfully
+Creating web application...
+✅ Web application created
+
+🚀 Meeting Agent Starting!
+📱 Web Interface: http://127.0.0.1:5004
+🔧 Debug Mode: OFF
+⚠️  Press Ctrl+C to stop the server
+
+✨ Features Available:
+   • 🎙️  Start/Stop meeting recording
+   • 📝 Real-time transcript display
+   • 🤖 AI-powered meeting summaries
+   • 📚 Meeting history and search
+   • 📊 Daily summary generation
+   • 📋 One-click ChatGPT format copying
+
+🌐 Starting web server...
+ * Serving Flask app 'src.web.app'
+ * Debug mode: off
+Address already in use
+Port 5004 is in use by another program. Either identify and stop that program, or start the server with a different port.
+2025-08-08 20:18:23,427 - src.main - INFO - Cleaning up Meeting Agent...
+2025-08-08 20:18:23,427 - src.audio.recorder - INFO - Audio recorder cleaned up
+2025-08-08 20:18:23,427 - src.transcription.transcriber - INFO - Transcriber cleaned up
+2025-08-08 20:18:23,427 - src.database.database - INFO - Database connection closed
+2025-08-08 20:18:23,427 - src.main - INFO - Meeting Agent cleanup completed
+✅ Cleanup completed
+2025-08-08 20:18:23,442 - src.audio.recorder - INFO - Audio recorder cleaned up

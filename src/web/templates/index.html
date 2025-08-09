@@ -5,213 +5,347 @@
 {% block header %}Meeting Agent Dashboard{% endblock %}
 
 {% block content %}
-<div class="section">
-    <h3>🎙️ Current Status</h3>
-    <div class="meta-info">
-        <p><strong>System Status:</strong> 
-            <span style="color: {{ 'green' if system_status.status == 'healthy' else 'red' }};">
-                {{ system_status.status|title }}
-            </span>
-        </p>
-        {% if meeting_status.status == 'recording' %}
-            <p><strong>Recording Status:</strong> 
-                <span style="color: red;">🔴 Recording: {{ meeting_status.meeting.name }}</span>
-            </p>
-            <p><strong>Duration:</strong> {{ (meeting_status.meeting.duration_seconds // 60) }} minutes</p>
-            {% if meeting_status.cost_info %}
-                <p><strong>Transcription Cost:</strong> ${{ "%.4f"|format(meeting_status.cost_info.total_cost) }}</p>
+
+<style>
+/* Enhanced Dashboard Styles */
+.control-center {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.status-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 25px;
+    border-radius: 15px;
+    margin-bottom: 30px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.recording-status {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(255, 107, 107, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0); }
+}
+
+.big-button {
+    padding: 20px 40px;
+    font-size: 1.5em;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 250px;
+    margin: 10px;
+    font-weight: bold;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+}
+
+.start-button {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    color: white;
+}
+
+.start-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(17, 153, 142, 0.4);
+}
+
+.stop-button {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+    color: white;
+}
+
+.stop-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(255, 107, 107, 0.4);
+}
+
+.meeting-form {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    margin: 20px 0;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-input {
+    width: 100%;
+    padding: 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+.form-input:focus {
+    border-color: #667eea;
+    outline: none;
+}
+
+.live-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.stat-card {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+}
+
+.stat-number {
+    font-size: 2em;
+    font-weight: bold;
+    color: #667eea;
+}
+
+#live-timer {
+    color: #ff6b6b;
+    font-family: 'Courier New', monospace;
+    text-shadow: 0 0 10px rgba(255, 107, 107, 0.3);
+}
+</style>
+
+<div class="control-center">
+    <!-- Status Card -->
+    <div class="status-card {{ 'recording-status' if meeting_status.status == 'recording' else '' }}">
+        <h2>
+            {% if meeting_status.status == 'recording' %}
+                🔴 Recording: {{ meeting_status.meeting.name }}
+            {% else %}
+                🎙️ Meeting Agent Ready
             {% endif %}
-        {% else %}
-            <p><strong>Status:</strong> <span style="color: gray;">⚫ No active meeting</span></p>
-        {% endif %}
-    </div>
-</div>
-
-<div class="section">
-    <h3>🎬 Meeting Controls</h3>
-    
-    {% if meeting_status.status != 'recording' %}
-        <!-- Start Meeting Form -->
-        <form method="post" action="/api/start_meeting" onsubmit="return startMeeting(event)">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-            <div style="margin: 10px 0;">
-                <label for="meeting_name">Meeting Name:</label><br>
-                <input type="text" id="meeting_name" name="name" placeholder="Enter meeting name..." required 
-                       style="width: 300px; padding: 8px; margin: 5px 0;">
-            </div>
-            <div style="margin: 10px 0;">
-                <label for="participants">Participants (optional):</label><br>
-                <input type="text" id="participants" name="participants" placeholder="Alice, Bob, Charlie..." 
-                       style="width: 300px; padding: 8px; margin: 5px 0;">
-            </div>
-            <button type="submit" class="button">🎙️ Start Recording</button>
-        </form>
-    {% else %}
-        <!-- Stop Meeting Controls -->
-        <div class="alert alert-error">
-            <p><strong>🔴 Recording in progress:</strong> {{ meeting_status.meeting.name }}</p>
-            <p>Started: {{ meeting_status.meeting.start_time }}</p>
-            <p>Duration: {{ (meeting_status.meeting.duration_seconds // 60) }} minutes</p>
-        </div>
+        </h2>
         
-        <button type="button" class="button" style="background: #dc3545;" onclick="stopMeeting()">
-            ⏹️ Stop Recording
-        </button>
-        
-        <!-- Live Transcript Section -->
-        <div class="section" id="live-transcript" style="margin-top: 20px;">
-            <h3>📝 Live Transcript 
-                <span style="font-size: 0.8em; color: #666;">
-                    <span id="connection-status">⚫ Connecting...</span>
-                </span>
-            </h3>
-            <div id="transcript-content" 
-                 style="background: #f9f9f9; border: 1px solid #ddd; padding: 15px; min-height: 150px; max-height: 300px; overflow-y: auto; font-family: 'Courier New', monospace;">
-                <p id="transcript-text" style="margin: 0; color: #666;"><em>Live transcript will appear here...</em></p>
-            </div>
-            <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
-                <span id="word-count">Words: 0</span>
-                <span style="float: right;" id="last-update">Ready</span>
-            </div>
-        </div>
-    {% endif %}
-</div>
-
-<div class="section">
-    <h3>📋 Recent Meetings</h3>
-    {% if recent_meetings %}
-        <div style="max-height: 300px; overflow-y: auto;">
-            {% for meeting in recent_meetings %}
-                <div class="action-item">
-                    <strong>{{ meeting.name }}</strong>
-                    <span style="float: right; color: #666;">
-                        {{ meeting.date }} 
-                        ({{ meeting.duration_minutes or 0 }} min)
-                    </span>
-                    <br>
-                    <small style="color: #666;">
-                        {% if meeting.participants %}
-                            Participants: {{ meeting.participants|join(', ') }}
+        {% if meeting_status.status == 'recording' %}
+            <div class="live-stats">
+                <div class="stat-card">
+                    <div class="stat-number" id="live-timer">
+                        {% if meeting_status.meeting and meeting_status.meeting.duration_seconds %}
+                            {% set duration = meeting_status.meeting.duration_seconds|int %}
+                            {% set minutes = (duration // 60) %}
+                            {% set seconds = (duration % 60) %}
+                            {{ "%02d:%02d"|format(minutes, seconds) }}
+                        {% else %}
+                            00:00
                         {% endif %}
-                        {% if meeting.transcription_cost %}
-                            | Cost: ${{ "%.4f"|format(meeting.transcription_cost) }}
-                        {% endif %}
-                    </small>
+                    </div>
+                    <div>Duration</div>
                 </div>
-            {% endfor %}
-        </div>
-        <div style="margin-top: 15px;">
-            <a href="/meetings" class="button secondary">View All Meetings →</a>
-        </div>
-    {% else %}
-        <p style="color: #666; font-style: italic;">No recent meetings found.</p>
-        <p>Start your first meeting using the controls above!</p>
-    {% endif %}
-</div>
-
-<div class="section">
-    <h3>⚙️ System Information</h3>
-    <div class="meta-info">
-        {% if system_status.components %}
-            {% for component, details in system_status.components.items() %}
-                <p><strong>{{ component|title }}:</strong> 
-                    <span style="color: {{ 'green' if details.status in ['connected', 'available'] else 'red' }};">
-                        {{ details.status|title }}
-                    </span>
-                    {% if details.model %}
-                        ({{ details.model }})
-                    {% endif %}
-                    {% if details.devices_count is defined %}
-                        ({{ details.devices_count }} devices)
-                    {% endif %}
-                </p>
-            {% endfor %}
+                {% if meeting_status.cost_info %}
+                <div class="stat-card">
+                    <div class="stat-number">${{ "%.3f"|format(meeting_status.cost_info.total_cost) }}</div>
+                    <div>Cost</div>
+                </div>
+                {% endif %}
+                {% if meeting_status.transcript %}
+                <div class="stat-card">
+                    <div class="stat-number">{{ meeting_status.transcript.split()|length }}</div>
+                    <div>Words</div>
+                </div>
+                {% endif %}
+            </div>
+        {% else %}
+            <p>System Status: <strong>{{ system_status.status|title }}</strong></p>
         {% endif %}
-        <p><strong>Web Interface:</strong> <span style="color: green;">Active</span></p>
+    </div>
+
+    <!-- Meeting Controls -->
+    <div class="text-center">
+        {% if meeting_status.status != 'recording' %}
+            <!-- Start Meeting Form -->
+            <div class="meeting-form">
+                <h3>🎙️ Start New Meeting</h3>
+                <form method="post" action="/api/start_meeting" onsubmit="return startMeeting(event)">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="form-group">
+                        <label for="meeting_name" style="font-weight: bold; color: #333;">Meeting Name:</label>
+                        <input type="text" id="meeting_name" name="name" 
+                               class="form-input" placeholder="Enter meeting name..." required>
+                    </div>
+                    
+                    <button type="submit" class="big-button start-button">
+                        🎙️ Start Recording
+                    </button>
+                </form>
+            </div>
+        {% else %}
+            <!-- Stop Meeting Controls -->
+            <div class="text-center">
+                <form method="post" action="/api/stop_meeting" onsubmit="return stopMeeting(event)">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="big-button stop-button">
+                        🛑 Stop Recording & Generate Summary
+                    </button>
+                </form>
+            </div>
+            
+            <!-- Live Transcript Display -->
+            <div id="live-transcript-container" style="margin-top: 30px;">
+                <h3>📝 Live Transcript</h3>
+                <div id="transcript-display" style="
+                    background: #f8f9fa; 
+                    border: 2px solid #e0e0e0; 
+                    border-radius: 10px; 
+                    padding: 20px; 
+                    max-height: 300px; 
+                    overflow-y: auto;
+                    text-align: left;
+                    font-family: Georgia, serif;
+                    line-height: 1.6;">
+                    <em>Listening for audio...</em>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="section" style="margin-top: 40px;">
+        <h3>⚡ Quick Actions</h3>
+        <div class="text-center">
+            <a href="/meetings" class="big-button" style="background: #667eea; color: white; text-decoration: none;">
+                📚 View Meeting History
+            </a>
+            <button onclick="generateDailySummary()" class="big-button" style="background: #764ba2; color: white;">
+                📊 Generate Daily Summary
+            </button>
+            <a href="/settings" class="big-button" style="background: #6c757d; color: white; text-decoration: none;">
+                ⚙️ Settings
+            </a>
+        </div>
+    </div>
+
+    <!-- Recent Meetings Preview -->
+    <div class="section" style="margin-top: 40px;">
+        <h3>📋 Recent Meetings</h3>
+        {% if recent_meetings %}
+            <div style="max-height: 300px; overflow-y: auto;">
+                {% for meeting in recent_meetings[:3] %}
+                    <div class="action-item" style="padding: 15px; margin: 10px 0; background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                        <strong>{{ meeting.name }}</strong>
+                        <span style="float: right; color: #666; font-size: 0.9em;">
+                            {{ meeting.date }}
+                            {% if meeting.start_time_minutes is defined %}
+                                • {{ "%02d:%02d"|format(meeting.start_time_minutes // 60, meeting.start_time_minutes % 60) }}
+                            {% endif %}
+                            • {% if meeting.duration_seconds and meeting.duration_seconds > 0 %}
+                                {% set minutes = (meeting.duration_seconds / 60)|int %}
+                                {% set seconds = (meeting.duration_seconds % 60)|int %}
+                                {{ minutes }}m {{ seconds }}s
+                            {% else %}
+                                {{ meeting.duration_minutes or 0 }}min
+                            {% endif %}
+                        </span>
+                        <br>
+                        <div style="margin-top: 5px;">
+                            <small style="color: #666;">
+                                {% if meeting.transcription_cost %}
+                                    💰 ${{ "%.4f"|format(meeting.transcription_cost) }}
+                                {% endif %}
+                                • 📊 {{ meeting.status|title }}
+                            </small>
+                            <a href="/meetings/{{ meeting.id }}" style="float: right; text-decoration: none; color: #667eea;">
+                                View Details →
+                            </a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <a href="/meetings" class="big-button" style="background: #6c757d; color: white; text-decoration: none;">
+                    📚 View All Meetings
+                </a>
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 40px; background: #f8f9fa; border-radius: 10px; color: #666;">
+                <h4>No meetings yet</h4>
+                <p>Start your first meeting using the form above!</p>
+            </div>
+        {% endif %}
     </div>
 </div>
 
-<!-- WebSocket Support for Real-time Updates -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.4/socket.io.js"></script>
 <script>
-    // WebSocket connection
-    const socket = io();
-    let isConnected = false;
     
-    // DOM elements
-    const connectionStatus = document.getElementById('connection-status');
-    const transcriptText = document.getElementById('transcript-text');
-    const wordCount = document.getElementById('word-count');
-    const lastUpdate = document.getElementById('last-update');
+    // Timer state - global variables
+    window.timerInterval = null;
+    window.recordingStartTime = null;
     
-    // WebSocket events
-    socket.on('connect', function() {
-        console.log('WebSocket connected');
-        isConnected = true;
-        if (connectionStatus) {
-            connectionStatus.innerHTML = '🟢 Connected';
-            connectionStatus.style.color = 'green';
-        }
-        // Subscribe to transcript updates immediately upon connection
-        socket.emit('subscribe_transcript');
-    });
-    
-    socket.on('disconnect', function() {
-        console.log('WebSocket disconnected');
-        isConnected = false;
-        if (connectionStatus) {
-            connectionStatus.innerHTML = '⚫ Disconnected';
-            connectionStatus.style.color = 'red';
-        }
-    });
-    
-    socket.on('transcript_update', function(data) {
-        console.log('Transcript update:', data);
-        
-        if (transcriptText && data.text) {
-            // Clear placeholder text on first update
-            if (transcriptText.innerHTML.includes('Live transcript will appear here')) {
-                transcriptText.innerHTML = '';
-            }
-            
-            // Append new text (both partial and final transcripts)
-            if (data.is_final) {
-                // Final transcript - add with regular formatting
-                transcriptText.innerHTML += data.text + ' ';
-            } else {
-                // Partial transcript - add with italic formatting to show it's in progress
-                transcriptText.innerHTML += '<span style="color: #888; font-style: italic;">' + data.text + '</span> ';
-            }
-            
-            // Auto-scroll
-            const container = transcriptText.parentElement;
-            container.scrollTop = container.scrollHeight;
+    // Timer functions
+    function startRecordingTimer() {
+        // Clear any existing timer
+        if (window.timerInterval) {
+            clearInterval(window.timerInterval);
         }
         
-        // Update stats
-        if (wordCount && data.word_count) {
-            wordCount.textContent = 'Words: ' + data.word_count;
+        // Set start time to now
+        window.recordingStartTime = Date.now();
+        
+        // Update timer immediately
+        updateTimer();
+        
+        // Then update every second
+        window.timerInterval = setInterval(updateTimer, 1000);
+    }
+    
+    function updateTimer() {
+        const timerElement = document.getElementById('live-timer');
+        
+        if (!timerElement) {
+            return;
         }
         
-        if (lastUpdate) {
-            lastUpdate.textContent = 'Updated: ' + data.timestamp;
+        if (!window.recordingStartTime) {
+            return;
         }
-    });
+        
+        const elapsed = Math.floor((Date.now() - window.recordingStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        const display = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        
+        timerElement.textContent = display;
+    }
     
-    socket.on('meeting_status', function(data) {
-        console.log('Meeting status update:', data);
-        // Refresh page if meeting status changed significantly
-        if (data.status === 'idle' && window.location.pathname === '/') {
-            setTimeout(() => window.location.reload(), 1000);
+    function stopRecordingTimer() {
+        if (window.timerInterval) {
+            clearInterval(window.timerInterval);
+            window.timerInterval = null;
         }
-    });
+        window.recordingStartTime = null;
+    }
     
-    // Functions for meeting control
+    // WebSocket removed for simplicity
+    
+    // Meeting control functions
     function startMeeting(event) {
         event.preventDefault();
         
         const form = event.target;
         const formData = new FormData(form);
+        const submitButton = form.querySelector('button[type="submit"]');
+        
+        submitButton.innerHTML = '🔄 Starting...';
+        submitButton.disabled = true;
         
         fetch('/api/start_meeting', {
             method: 'POST',
@@ -220,68 +354,113 @@
             },
             body: JSON.stringify({
                 name: formData.get('name'),
-                participants: formData.get('participants') ? formData.get('participants').split(',').map(p => p.trim()) : [],
                 _csrf_token: formData.get('_csrf_token')
             })
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Meeting started successfully!');
                 window.location.reload();
             } else {
-                alert('Error starting meeting: ' + (data.error || 'Unknown error'));
+                alert('Error: ' + (data.error || 'Failed to start meeting'));
+                submitButton.innerHTML = '🎙️ Start Recording';
+                submitButton.disabled = false;
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            alert('Failed to start meeting. Please try again.');
+            alert('Network error: ' + error.message);
+            submitButton.innerHTML = '🎙️ Start Recording';
+            submitButton.disabled = false;
         });
         
         return false;
     }
     
-    function stopMeeting() {
-        if (confirm('Are you sure you want to stop the current meeting?')) {
-            fetch('/api/stop_meeting', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    _csrf_token: '{{ csrf_token() }}'
-                })
+    function stopMeeting(event) {
+        event.preventDefault();
+        
+        const form = event.target;
+        const formData = new FormData(form);
+        const submitButton = form.querySelector('button[type="submit"]');
+        
+        submitButton.innerHTML = '🔄 Stopping...';
+        submitButton.disabled = true;
+        
+        fetch('/api/stop_meeting', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                _csrf_token: formData.get('_csrf_token')
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert('Meeting stopped successfully!');
-                    window.location.reload();
-                } else {
-                    alert('Error stopping meeting: ' + (data.error || 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Failed to stop meeting. Please try again.');
-            });
-        }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                stopRecordingTimer();
+                window.location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to stop meeting'));
+                submitButton.innerHTML = '🛑 Stop Recording & Generate Summary';
+                submitButton.disabled = false;
+            }
+        })
+        .catch(error => {
+            alert('Network error: ' + error.message);
+            submitButton.innerHTML = '🛑 Stop Recording & Generate Summary';
+            submitButton.disabled = false;
+        });
+        
+        return false;
     }
     
-    // Request initial status and subscribe to updates
-    if (isConnected) {
-        socket.emit('get_status');
-    } else {
-        socket.on('connect', function() {
-            socket.emit('get_status');
+    function generateDailySummary() {
+        const date = prompt('Enter date (YYYY-MM-DD) or leave blank for today:');
+        const targetDate = date || new Date().toISOString().split('T')[0];
+        
+        fetch(`/api/daily_summary?date=${targetDate}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('📊 Daily summary generated successfully!\n\n' + data.summary);
+            } else {
+                alert('❌ Error generating daily summary: ' + (data.error || 'No meetings found for this date'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('❌ Failed to generate daily summary. Please try again.');
         });
     }
     
-    // Periodically refresh status
-    setInterval(() => {
-        if (isConnected) {
-            socket.emit('get_status');
+    // Initialize timer on page load if recording is active
+    document.addEventListener('DOMContentLoaded', function() {
+        const timerElement = document.getElementById('live-timer');
+        const recordingStatus = document.querySelector('.recording-status');
+        
+        if (timerElement && recordingStatus) {
+            // Get initial duration from the timer element
+            const initialTime = timerElement.textContent.trim();
+            const [minutes, seconds] = initialTime.split(':').map(n => parseInt(n) || 0);
+            const initialSeconds = minutes * 60 + seconds;
+            
+            // Calculate when recording started
+            window.recordingStartTime = Date.now() - (initialSeconds * 1000);
+            
+            // Start the timer
+            window.timerInterval = setInterval(updateTimer, 1000);
+            updateTimer(); // Update immediately
         }
-    }, 5000);
+        
+        // Request status every 5 seconds (if WebSocket is available)
+        if (window.socket && window.socket.emit) {
+            setInterval(function() {
+                if (isConnected) {
+                    window.socket.emit('get_status');
+                }
+            }, 5000);
+        }
+    });
 </script>
 {% endblock %}

@@ -2,6 +2,6 @@
 Notifications package for Meeting Agent
 """
 
-from .sender import EmailSender, MockEmailSender
+from .sender import EmailSender
 
-__all__ = ["EmailSender", "MockEmailSender"]
+__all__ = ["EmailSender"]
