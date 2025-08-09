@@ -19,6 +19,11 @@ def start_web_interface():
     print("🌐 Starting Meeting Agent Web Interface")
     print("=" * 40)
     
+    # Ensure logs directory exists
+    logs_dir = Path(__file__).parent / "logs"
+    logs_dir.mkdir(exist_ok=True)
+    print(f"📁 Logs directory: {logs_dir}")
+    
     try:
         # Initialize Meeting Agent
         print("Initializing Meeting Agent...")
@@ -41,6 +46,8 @@ def start_web_interface():
         print(f"\n🚀 Web Interface Starting!")
         print(f"📱 Open your browser to: http://localhost:5003")
         print(f"⚠️  Press Ctrl+C to stop the server")
+        print(f"📄 Debug logs: {logs_dir / 'meeting_agent.log'}")
+        print(f"🌐 Web logs: {logs_dir / 'web_interface.log'}")
         print(f"\nFeatures available:")
         print(f"• Meeting dashboard")
         print(f"• Start/stop meeting controls")
@@ -48,6 +55,7 @@ def start_web_interface():
         print(f"• System status")
         if use_socketio:
             print(f"• 🔴 Real-time transcript display during meetings")
+        print(f"\n🔍 DEBUG MODE: Comprehensive logging enabled")
         
         # Start the web server
         if use_socketio:

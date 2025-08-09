@@ -18,7 +18,7 @@ except ImportError:
 
 from ..utils.logger import setup_logger
 
-logger = setup_logger(__name__)
+logger = setup_logger(__name__, log_file='logs/web_interface.log', level='DEBUG')
 
 
 def csrf_protect(f):
@@ -111,6 +111,11 @@ def create_app(config: Optional[Dict[str, Any]] = None, meeting_agent=None) -> F
     @csrf_protect
     def api_start_meeting():
         """Start a new meeting"""
+        logger.info("=== API START MEETING CALLED ===")
+        logger.debug(f"Request method: {request.method}")
+        logger.debug(f"Request content type: {request.content_type}")
+        logger.debug(f"Request data: {request.get_json()}")
+        
         try:
             if not app.meeting_agent:
                 return jsonify({'error': 'Meeting Agent not initialized'}), 500
@@ -141,6 +146,10 @@ def create_app(config: Optional[Dict[str, Any]] = None, meeting_agent=None) -> F
     @csrf_protect
     def api_stop_meeting():
         """Stop the current meeting"""
+        logger.info("=== API STOP MEETING CALLED ===")
+        logger.debug(f"Request method: {request.method}")
+        logger.debug(f"Request content type: {request.content_type}")
+        
         try:
             if not app.meeting_agent:
                 return jsonify({'error': 'Meeting Agent not initialized'}), 500

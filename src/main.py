@@ -19,7 +19,7 @@ from .transcription.transcriber import Transcriber
 from .ai.summarizer import Summarizer
 from .notifications.sender import EmailSender
 
-logger = setup_logger(__name__)
+logger = setup_logger(__name__)  # Will be reconfigured after config load
 
 
 class MeetingAgent:
@@ -29,6 +29,18 @@ class MeetingAgent:
         """Initialize Meeting Agent with configuration"""
         # Load configuration
         self.config = load_config(config_path, validate_secrets=not use_mock_components)
+        
+        # Configure logging with settings from config
+        global logger
+        logger = setup_logger(
+            __name__, 
+            log_file=self.config.get('logging.file', 'logs/meeting_agent.log'),
+            level=self.config.get('logging.level', 'DEBUG')
+        )
+        logger.info("=== Meeting Agent Starting ===")
+        logger.debug(f"Configuration loaded from: {config_path or 'default'}")
+        logger.debug(f"Using mock components: {use_mock_components}")
+        logger.debug(f"Config sections loaded: {list(self.config.keys())}")
         
         # State management
         self.is_running = False
@@ -204,8 +216,10 @@ class MeetingAgent:
         if self.current_meeting:
             raise ValueError("A meeting is already being recorded")
             
-        logger.info(f"Starting meeting: {meeting_name}")
+        logger.info(f"=== STARTING MEETING: {meeting_name} ===")
+        logger.debug(f"Participants: {participants or 'None provided'}")
         logger.debug(f"Audio config: {self.config.get('audio', {})}")
+        logger.debug(f"Using mock components: {self.use_mock_components}")
         logger.debug(f"Using transcription model: {self.config.get('openai.transcription_model', 'whisper-1')}")
         
         try:
@@ -267,10 +281,15 @@ class MeetingAgent:
     
     def stop_meeting(self) -> Dict[str, Any]:
         """Stop recording the current meeting and process it"""
+        logger.info("=== STOP MEETING REQUESTED ===")
+        
         if not self.current_meeting:
+            logger.warning("Stop meeting rejected - no meeting in progress")
             raise ValueError("No meeting is currently being recorded")
             
         meeting_name = self.current_meeting['name']
+        logger.info(f"=== STOPPING MEETING: {meeting_name} ===")
+        logger.debug(f"Meeting ID: {self.current_meeting.get('id')}")
         meeting_id = self.current_meeting['id']
         
         logger.info(f"Stopping meeting: {meeting_name}")
