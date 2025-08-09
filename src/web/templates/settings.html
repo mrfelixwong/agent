@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Meeting Agent{% endblock %}
+
+{% block header %}Settings{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h3>⚙️ System Status</h3>
+    <div class="meta-info">
+        <p><strong>Overall Status:</strong> 
+            <span style="color: {{ 'green' if system_status.status == 'healthy' else 'red' }};">
+                {{ system_status.status|title }}
+            </span>
+        </p>
+        {% if system_status.error %}
+            <p><strong>Error:</strong> <span style="color: red;">{{ system_status.error }}</span></p>
+        {% endif %}
+    </div>
+</div>
+
+{% if system_status.components %}
+<div class="section">
+    <h3>🔧 Component Status</h3>
+    
+    {% for component, details in system_status.components.items() %}
+        <div class="action-item">
+            <strong>{{ component|title }}</strong>
+            <span style="float: right; color: {{ 'green' if details.status in ['connected', 'available'] else 'red' }};">
+                {{ details.status|title }}
+            </span>
+            <br>
+            <small style="color: #666;">
+                {% if details.model %}
+                    Model: {{ details.model }}
+                {% endif %}
+                {% if details.address %}
+                    Address: {{ details.address }}
+                {% endif %}
+                {% if details.devices_count is defined %}
+                    Available devices: {{ details.devices_count }}
+                {% endif %}
+                {% if details.default_device %}
+                    Default device: {{ details.default_device }}
+                {% endif %}
+                {% if details.statistics %}
+                    <br>
+                    {% for stat_name, stat_value in details.statistics.items() %}
+                        {{ stat_name|replace('_', ' ')|title }}: {{ stat_value }}
+                        {% if not loop.last %} | {% endif %}
+                    {% endfor %}
+                {% endif %}
+            </small>
+        </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="section">
+    <h3>📊 System Information</h3>
+    <div class="copy-format">
+System Status: {{ system_status.status }}
+{% if system_status.components %}
+Components:
+{% for component, details in system_status.components.items() %}
+  {{ component }}: {{ details.status }}{% if details.model %} ({{ details.model }}){% endif %}
+{% endfor %}
+{% endif %}
+
+Web Interface: Active
+Real-time Features: Available
+    </div>
+    <button class="button copy" onclick="copySystemInfo()">📋 Copy System Info</button>
+</div>
+
+<div class="section">
+    <h3>🔄 Actions</h3>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button class="button secondary" onclick="refreshStatus()">🔄 Refresh Status</button>
+        <button class="button secondary" onclick="testConnections()">🧪 Test All Connections</button>
+        <a href="/api/daily_summary" class="button secondary" target="_blank">📋 View Today's Summary</a>
+    </div>
+</div>
+
+<div class="section">
+    <h3>⚠️ Troubleshooting</h3>
+    <details>
+        <summary style="cursor: pointer; padding: 10px; background: #f8f9fa; border-radius: 4px;">
+            Common Issues & Solutions
+        </summary>
+        <div style="padding: 15px; background: #fff; border: 1px solid #ddd; margin-top: 5px; border-radius: 4px;">
+            <h4>Audio Issues:</h4>
+            <ul>
+                <li>Check microphone permissions in your browser and OS</li>
+                <li>Try using a different audio input device</li>
+                <li>Restart the application if audio devices changed</li>
+            </ul>
+            
+            <h4>Transcription Issues:</h4>
+            <ul>
+                <li>Verify OpenAI API key is configured correctly</li>
+                <li>Check internet connection for API access</li>
+                <li>Monitor API rate limits and usage</li>
+            </ul>
+            
+            <h4>Email Issues:</h4>
+            <ul>
+                <li>Verify email credentials in configuration</li>
+                <li>Check SMTP server settings</li>
+                <li>Enable "Less secure app access" for Gmail (if applicable)</li>
+            </ul>
+            
+            <h4>Database Issues:</h4>
+            <ul>
+                <li>Check database file permissions</li>
+                <li>Ensure sufficient disk space</li>
+                <li>Verify database path is accessible</li>
+            </ul>
+        </div>
+    </details>
+</div>
+
+<div class="section">
+    <h3>📁 Configuration</h3>
+    <p style="color: #666;">
+        Configuration file: <code>config/settings.yml</code><br>
+        Database: <code>data/meetings.db</code><br>
+        Recordings: <code>data/recordings/</code><br>
+        Logs: Check console output for detailed logging
+    </p>
+    
+    <div style="margin-top: 15px;">
+        <a href="/" class="button">← Back to Dashboard</a>
+        <a href="/meetings" class="button secondary">View Meetings</a>
+    </div>
+</div>
+
+<script>
+function copySystemInfo() {
+    const systemInfo = document.querySelector('.copy-format').textContent;
+    navigator.clipboard.writeText(systemInfo).then(() => {
+        const button = event.target;
+        const original = button.textContent;
+        button.textContent = '✅ Copied!';
+        button.style.background = '#28a745';
+        setTimeout(() => {
+            button.textContent = original;
+            button.style.background = '';
+        }, 2000);
+    });
+}
+
+function refreshStatus() {
+    window.location.reload();
+}
+
+function testConnections() {
+    const button = event.target;
+    const original = button.textContent;
+    button.textContent = '🧪 Testing...';
+    button.disabled = true;
+    
+    fetch('/api/status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.system && data.system.status === 'healthy') {
+                alert('✅ All connections are working properly!');
+            } else {
+                alert('⚠️ Some connections have issues. Check the status above for details.');
+            }
+        })
+        .catch(error => {
+            alert('❌ Failed to test connections: ' + error.message);
+        })
+        .finally(() => {
+            button.textContent = original;
+            button.disabled = false;
+        });
+}
+</script>
+{% endblock %}

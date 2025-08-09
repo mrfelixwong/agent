@@ -38,7 +38,7 @@
         </button>
     </h3>
     <p>One-click copy in perfect format for ChatGPT analysis:</p>
-    <div class="copy-format" id="chatgpt-format">{{ getChatGPTText() }}</div>
+    <div class="copy-format" id="chatgpt-format">Loading ChatGPT format...</div>
 </div>
 
 {% if meeting.summary %}
@@ -257,8 +257,9 @@
 
 {% block extra_js %}
 <script>
-    // Generate ChatGPT-optimized format
-    document.getElementById('chatgpt-format').textContent = `MEETING SUMMARY - ${meetingData.name} (${meetingData.date})
+    // Generate ChatGPT-optimized format when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        const chatgptFormat = `MEETING SUMMARY - ${meetingData.name} (${meetingData.date})
 
 CONTEXT:
 Meeting with ${(meetingData.participants || []).length} participant${(meetingData.participants || []).length !== 1 ? 's' : ''}, ${meetingData.duration_minutes || 0} minutes duration
@@ -286,5 +287,8 @@ Please help me analyze this meeting and suggest:
 1. Risk mitigation strategies for any issues discussed
 2. Follow-up questions for next steps
 3. Resource allocation recommendations`;
+        
+        document.getElementById('chatgpt-format').textContent = chatgptFormat;
+    });
 </script>
 {% endblock %}

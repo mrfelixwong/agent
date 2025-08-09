@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Meeting Agent{% endblock %}
+
+{% block header %}Meeting Agent Dashboard{% endblock %}
+
+{% block content %}
+<div class="section">
+    <h3>🎙️ Current Status</h3>
+    <div class="meta-info">
+        <p><strong>System Status:</strong> 
+            <span style="color: {{ 'green' if system_status.status == 'healthy' else 'red' }};">
+                {{ system_status.status|title }}
+            </span>
+        </p>
+        {% if meeting_status.status == 'recording' %}
+            <p><strong>Recording Status:</strong> 
+                <span style="color: red;">🔴 Recording: {{ meeting_status.meeting.name }}</span>
+            </p>
+            <p><strong>Duration:</strong> {{ (meeting_status.meeting.duration_seconds // 60) }} minutes</p>
+            {% if meeting_status.cost_info %}
+                <p><strong>Transcription Cost:</strong> ${{ "%.4f"|format(meeting_status.cost_info.total_cost) }}</p>
+            {% endif %}
+        {% else %}
+            <p><strong>Status:</strong> <span style="color: gray;">⚫ No active meeting</span></p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="section">
+    <h3>🎬 Meeting Controls</h3>
+    
+    {% if meeting_status.status != 'recording' %}
+        <!-- Start Meeting Form -->
+        <form method="post" action="/api/start_meeting" onsubmit="return startMeeting(event)">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <div style="margin: 10px 0;">
+                <label for="meeting_name">Meeting Name:</label><br>
+                <input type="text" id="meeting_name" name="name" placeholder="Enter meeting name..." required 
+                       style="width: 300px; padding: 8px; margin: 5px 0;">
+            </div>
+            <div style="margin: 10px 0;">
+                <label for="participants">Participants (optional):</label><br>
+                <input type="text" id="participants" name="participants" placeholder="Alice, Bob, Charlie..." 
+                       style="width: 300px; padding: 8px; margin: 5px 0;">
+            </div>
+            <button type="submit" class="button">🎙️ Start Recording</button>
+        </form>
+    {% else %}
+        <!-- Stop Meeting Controls -->
+        <div class="alert alert-error">
+            <p><strong>🔴 Recording in progress:</strong> {{ meeting_status.meeting.name }}</p>
+            <p>Started: {{ meeting_status.meeting.start_time }}</p>
+            <p>Duration: {{ (meeting_status.meeting.duration_seconds // 60) }} minutes</p>
+        </div>
+        
+        <button type="button" class="button" style="background: #dc3545;" onclick="stopMeeting()">
+            ⏹️ Stop Recording
+        </button>
+        
+        <!-- Live Transcript Section -->
+        <div class="section" id="live-transcript" style="margin-top: 20px;">
+            <h3>📝 Live Transcript 
+                <span style="font-size: 0.8em; color: #666;">
+                    <span id="connection-status">⚫ Connecting...</span>
+                </span>
+            </h3>
+            <div id="transcript-content" 
+                 style="background: #f9f9f9; border: 1px solid #ddd; padding: 15px; min-height: 150px; max-height: 300px; overflow-y: auto; font-family: 'Courier New', monospace;">
+                <p id="transcript-text" style="margin: 0; color: #666;"><em>Live transcript will appear here...</em></p>
+            </div>
+            <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                <span id="word-count">Words: 0</span>
+                <span style="float: right;" id="last-update">Ready</span>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h3>📋 Recent Meetings</h3>
+    {% if recent_meetings %}
+        <div style="max-height: 300px; overflow-y: auto;">
+            {% for meeting in recent_meetings %}
+                <div class="action-item">
+                    <strong>{{ meeting.name }}</strong>
+                    <span style="float: right; color: #666;">
+                        {{ meeting.date }} 
+                        ({{ meeting.duration_minutes or 0 }} min)
+                    </span>
+                    <br>
+                    <small style="color: #666;">
+                        {% if meeting.participants %}
+                            Participants: {{ meeting.participants|join(', ') }}
+                        {% endif %}
+                        {% if meeting.transcription_cost %}
+                            | Cost: ${{ "%.4f"|format(meeting.transcription_cost) }}
+                        {% endif %}
+                    </small>
+                </div>
+            {% endfor %}
+        </div>
+        <div style="margin-top: 15px;">
+            <a href="/meetings" class="button secondary">View All Meetings →</a>
+        </div>
+    {% else %}
+        <p style="color: #666; font-style: italic;">No recent meetings found.</p>
+        <p>Start your first meeting using the controls above!</p>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h3>⚙️ System Information</h3>
+    <div class="meta-info">
+        {% if system_status.components %}
+            {% for component, details in system_status.components.items() %}
+                <p><strong>{{ component|title }}:</strong> 
+                    <span style="color: {{ 'green' if details.status in ['connected', 'available'] else 'red' }};">
+                        {{ details.status|title }}
+                    </span>
+                    {% if details.model %}
+                        ({{ details.model }})
+                    {% endif %}
+                    {% if details.devices_count is defined %}
+                        ({{ details.devices_count }} devices)
+                    {% endif %}
+                </p>
+            {% endfor %}
+        {% endif %}
+        <p><strong>Web Interface:</strong> <span style="color: green;">Active</span></p>
+    </div>
+</div>
+
+<!-- WebSocket Support for Real-time Updates -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.4/socket.io.js"></script>
+<script>
+    // WebSocket connection
+    const socket = io();
+    let isConnected = false;
+    
+    // DOM elements
+    const connectionStatus = document.getElementById('connection-status');
+    const transcriptText = document.getElementById('transcript-text');
+    const wordCount = document.getElementById('word-count');
+    const lastUpdate = document.getElementById('last-update');
+    
+    // WebSocket events
+    socket.on('connect', function() {
+        console.log('WebSocket connected');
+        isConnected = true;
+        if (connectionStatus) {
+            connectionStatus.innerHTML = '🟢 Connected';
+            connectionStatus.style.color = 'green';
+        }
+        // Subscribe to transcript updates immediately upon connection
+        socket.emit('subscribe_transcript');
+    });
+    
+    socket.on('disconnect', function() {
+        console.log('WebSocket disconnected');
+        isConnected = false;
+        if (connectionStatus) {
+            connectionStatus.innerHTML = '⚫ Disconnected';
+            connectionStatus.style.color = 'red';
+        }
+    });
+    
+    socket.on('transcript_update', function(data) {
+        console.log('Transcript update:', data);
+        
+        if (transcriptText && data.text) {
+            // Clear placeholder text on first update
+            if (transcriptText.innerHTML.includes('Live transcript will appear here')) {
+                transcriptText.innerHTML = '';
+            }
+            
+            // Append new text (both partial and final transcripts)
+            if (data.is_final) {
+                // Final transcript - add with regular formatting
+                transcriptText.innerHTML += data.text + ' ';
+            } else {
+                // Partial transcript - add with italic formatting to show it's in progress
+                transcriptText.innerHTML += '<span style="color: #888; font-style: italic;">' + data.text + '</span> ';
+            }
+            
+            // Auto-scroll
+            const container = transcriptText.parentElement;
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        // Update stats
+        if (wordCount && data.word_count) {
+            wordCount.textContent = 'Words: ' + data.word_count;
+        }
+        
+        if (lastUpdate) {
+            lastUpdate.textContent = 'Updated: ' + data.timestamp;
+        }
+    });
+    
+    socket.on('meeting_status', function(data) {
+        console.log('Meeting status update:', data);
+        // Refresh page if meeting status changed significantly
+        if (data.status === 'idle' && window.location.pathname === '/') {
+            setTimeout(() => window.location.reload(), 1000);
+        }
+    });
+    
+    // Functions for meeting control
+    function startMeeting(event) {
+        event.preventDefault();
+        
+        const form = event.target;
+        const formData = new FormData(form);
+        
+        fetch('/api/start_meeting', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                name: formData.get('name'),
+                participants: formData.get('participants') ? formData.get('participants').split(',').map(p => p.trim()) : [],
+                _csrf_token: formData.get('_csrf_token')
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Meeting started successfully!');
+                window.location.reload();
+            } else {
+                alert('Error starting meeting: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to start meeting. Please try again.');
+        });
+        
+        return false;
+    }
+    
+    function stopMeeting() {
+        if (confirm('Are you sure you want to stop the current meeting?')) {
+            fetch('/api/stop_meeting', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    _csrf_token: '{{ csrf_token() }}'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Meeting stopped successfully!');
+                    window.location.reload();
+                } else {
+                    alert('Error stopping meeting: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to stop meeting. Please try again.');
+            });
+        }
+    }
+    
+    // Request initial status and subscribe to updates
+    if (isConnected) {
+        socket.emit('get_status');
+    } else {
+        socket.on('connect', function() {
+            socket.emit('get_status');
+        });
+    }
+    
+    // Periodically refresh status
+    setInterval(() => {
+        if (isConnected) {
+            socket.emit('get_status');
+        }
+    }, 5000);
+</script>
+{% endblock %}

@@ -499,12 +499,19 @@ def create_simple_app(meeting_agent) -> Flask:
                             toggleBtn.textContent = 'Hide Transcript';
                         }}
                         
-                        // Update transcript text
-                        if (data.is_final) {{
+                        // Update transcript text (show both partial and final)
+                        if (data.text) {{
                             if (transcriptText.innerHTML === '<em>Live transcript will appear here during meeting...</em>') {{
                                 transcriptText.innerHTML = '';
                             }}
-                            transcriptText.innerHTML += data.text + ' ';
+                            
+                            if (data.is_final) {{
+                                // Final transcript - add with regular formatting
+                                transcriptText.innerHTML += data.text + ' ';
+                            }} else {{
+                                // Partial transcript - add with italic styling to show it's in progress
+                                transcriptText.innerHTML += '<span style="color: #666; font-style: italic;">' + data.text + '</span> ';
+                            }}
                             
                             // Auto-scroll to bottom
                             const content = document.getElementById('transcript-content');

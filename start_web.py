@@ -39,7 +39,7 @@ def start_web_interface():
             use_socketio = False
         
         print(f"\n🚀 Web Interface Starting!")
-        print(f"📱 Open your browser to: http://localhost:5002")
+        print(f"📱 Open your browser to: http://localhost:5003")
         print(f"⚠️  Press Ctrl+C to stop the server")
         print(f"\nFeatures available:")
         print(f"• Meeting dashboard")
@@ -51,9 +51,9 @@ def start_web_interface():
         
         # Start the web server
         if use_socketio:
-            socketio.run(app, host='localhost', port=5002, debug=False, allow_unsafe_werkzeug=True)
+            socketio.run(app, host='localhost', port=5003, debug=False, allow_unsafe_werkzeug=True)
         else:
-            app.run(host='localhost', port=5002, debug=False)
+            app.run(host='localhost', port=5003, debug=False)
         
     except KeyboardInterrupt:
         print(f"\n👋 Web server stopped")
