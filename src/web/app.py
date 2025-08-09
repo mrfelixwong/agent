@@ -4,11 +4,13 @@ Provides a web interface for controlling meetings and viewing history
 """
 
 import json
+import secrets
 from datetime import datetime, date
 from typing import Dict, Any, Optional
+from functools import wraps
 
 try:
-    from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+    from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
     from flask_socketio import SocketIO, emit
     HAS_FLASK = True
 except ImportError:
@@ -17,6 +19,26 @@ except ImportError:
 from ..utils.logger import setup_logger
 
 logger = setup_logger(__name__)
+
+
+def csrf_protect(f):
+    """Decorator to check CSRF token for POST requests"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if request.method == "POST":
+            token = session.get('_csrf_token', None)
+            if not token or token != request.form.get('_csrf_token', request.json.get('_csrf_token')):
+                logger.warning(f"CSRF token validation failed for {request.endpoint}")
+                return jsonify({'error': 'CSRF token validation failed'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def generate_csrf_token():
+    """Generate a CSRF token for the session"""
+    if '_csrf_token' not in session:
+        session['_csrf_token'] = secrets.token_hex(16)
+    return session['_csrf_token']
 
 
 def create_app(config: Optional[Dict[str, Any]] = None, meeting_agent=None) -> Flask:
@@ -37,6 +59,9 @@ def create_app(config: Optional[Dict[str, Any]] = None, meeting_agent=None) -> F
     # Set socketio reference on meeting agent for transcript updates
     if meeting_agent:
         meeting_agent._socketio = socketio
+    
+    # Make CSRF token available in all templates
+    app.jinja_env.globals['csrf_token'] = generate_csrf_token
     
     @app.route('/')
     def index():
@@ -83,6 +108,7 @@ def create_app(config: Optional[Dict[str, Any]] = None, meeting_agent=None) -> F
             return jsonify({'error': str(e)}), 500
     
     @app.route('/api/start_meeting', methods=['POST'])
+    @csrf_protect
     def api_start_meeting():
         """Start a new meeting"""
         try:
@@ -112,6 +138,7 @@ def create_app(config: Optional[Dict[str, Any]] = None, meeting_agent=None) -> F
             return jsonify({'error': str(e)}), 500
     
     @app.route('/api/stop_meeting', methods=['POST'])
+    @csrf_protect
     def api_stop_meeting():
         """Stop the current meeting"""
         try:
@@ -220,6 +247,7 @@ def create_app(config: Optional[Dict[str, Any]] = None, meeting_agent=None) -> F
             return jsonify({'error': str(e)}), 500
     
     @app.route('/api/send_daily_email', methods=['POST'])
+    @csrf_protect
     def api_send_daily_email():
         """Send daily summary email"""
         try:
@@ -352,12 +380,16 @@ def create_simple_app(meeting_agent) -> Flask:
     app.config['SECRET_KEY'] = 'simple-meeting-agent-key'
     app.meeting_agent = meeting_agent
     
+    # Make CSRF token available in all templates
+    app.jinja_env.globals['csrf_token'] = generate_csrf_token
+    
     @app.route('/')
     def simple_index():
         """Simple HTML dashboard"""
         try:
             status = app.meeting_agent.get_meeting_status()
             system_status = app.meeting_agent.get_system_status()
+            csrf_token = generate_csrf_token()
             
             html = f"""
             <!DOCTYPE html>
@@ -395,6 +427,7 @@ def create_simple_app(meeting_agent) -> Flask:
                         <h3>Meeting Controls</h3>
                         <div id="start-meeting-form" style="{'display: none;' if status.get('status') == 'recording' else ''}">
                             <form method="post" action="/start_meeting">
+                                <input type="hidden" name="_csrf_token" value="{csrf_token}">
                                 <input type="text" name="meeting_name" placeholder="Meeting name..." required>
                                 <input type="text" name="participants" placeholder="Participants (comma-separated)">
                                 <button type="submit" class="button">Start Meeting</button>
@@ -534,7 +567,9 @@ def create_simple_app(meeting_agent) -> Flask:
                                 headers: {{
                                     'Content-Type': 'application/json',
                                 }},
-                                body: JSON.stringify({{}}),
+                                body: JSON.stringify({{
+                                    '_csrf_token': '{csrf_token}'
+                                }}),
                             }})
                             .then(response => response.json())
                             .then(data => {{
@@ -572,6 +607,7 @@ def create_simple_app(meeting_agent) -> Flask:
             return f"<h1>Error</h1><p>{str(e)}</p>"
     
     @app.route('/start_meeting', methods=['POST'])
+    @csrf_protect
     def simple_start_meeting():
         """Simple start meeting endpoint"""
         try:
@@ -596,6 +632,7 @@ def create_simple_app(meeting_agent) -> Flask:
             return f"<h1>Error</h1><p>{str(e)}</p><a href='/'>← Back</a>"
     
     @app.route('/stop_meeting', methods=['POST'])
+    @csrf_protect
     def simple_stop_meeting():
         """Simple stop meeting endpoint"""
         try:

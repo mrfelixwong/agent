@@ -347,11 +347,11 @@ class Database:
             cursor.execute("""
                 SELECT id, name, date, action_items 
                 FROM meetings 
-                WHERE date >= date('now', '-{} days') 
+                WHERE date >= date('now', '-' || ? || ' days') 
                 AND action_items IS NOT NULL 
                 AND action_items != '[]'
                 ORDER BY date DESC
-            """.format(days_back))
+            """, (days_back,))
             
             all_action_items = []
             for row in cursor.fetchall():
@@ -426,8 +426,8 @@ class Database:
             
             cursor.execute("""
                 DELETE FROM meetings 
-                WHERE date < date('now', '-{} days')
-            """.format(days_to_keep))
+                WHERE date < date('now', '-' || ? || ' days')
+            """, (days_to_keep,))
             
             deleted_count = cursor.rowcount
             conn.commit()
